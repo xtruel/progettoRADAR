@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>SNAKE</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{background:#000;color:#00ff41;font-family:'Courier New',monospace;
+  height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none;}
+#hdr{display:flex;justify-content:space-between;align-items:center;
+  padding:8px 14px;border-bottom:1px solid rgba(0,255,65,.25);flex-shrink:0;}
+.hbtn{background:none;border:1px solid rgba(0,255,65,.4);color:#00ff41;
+  font-family:'Courier New',monospace;font-size:12px;letter-spacing:2px;
+  padding:8px 14px;border-radius:4px;cursor:pointer;}
+.hbtn:active{background:rgba(0,255,65,.2);}
+#sval{font-size:clamp(20px,5vw,34px);font-weight:bold;text-shadow:0 0 10px #00ff41;}
+#main{flex:1;display:flex;align-items:center;justify-content:center;position:relative;}
+canvas{display:block;}
+#ov{position:absolute;inset:0;background:rgba(0,0,0,.9);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;}
+.ov-t{font-size:clamp(22px,6vw,42px);font-weight:bold;letter-spacing:4px;text-shadow:0 0 18px #00ff41;}
+.ov-s{font-size:clamp(12px,2.5vw,16px);opacity:.6;letter-spacing:2px;}
+.big-btn{background:rgba(0,255,65,.1);border:3px solid #00ff41;color:#00ff41;
+  font-family:'Courier New',monospace;font-size:clamp(16px,4vw,24px);font-weight:bold;
+  letter-spacing:4px;padding:16px 44px;border-radius:8px;cursor:pointer;
+  text-shadow:0 0 10px #00ff41;box-shadow:0 0 18px rgba(0,255,65,.3);}
+.big-btn:active{background:rgba(0,255,65,.3);transform:scale(.96);}
+#dpad{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px;flex-shrink:0;}
+.drow{display:flex;gap:3px;}
+.dk{width:clamp(52px,13vw,72px);height:clamp(52px,13vw,72px);
+  background:rgba(0,255,65,.07);border:2px solid rgba(0,255,65,.35);color:#00ff41;
+  font-size:clamp(18px,4.5vw,26px);border-radius:8px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;}
+.dk:active{background:rgba(0,255,65,.28);transform:scale(.92);}
+.de{background:none;border:none;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <button class="hbtn" onclick="location.href='radar_control.html'">RADAR</button>
+  <div style="text-align:center">
+    <div style="font-size:10px;opacity:.45;letter-spacing:3px">PUNTEGGIO</div>
+    <div id="sval">0</div>
+  </div>
+  <div style="text-align:right;font-size:11px;opacity:.45">
+    LV <span id="lv">1</span><br>
+    REC <span id="hi">0</span>
+  </div>
+</div>
+<div id="main">
+  <canvas id="cv"></canvas>
+  <div id="ov">
+    <div class="ov-t" id="ot">-- SNAKE --</div>
+    <div class="ov-s" id="os">Mangia i punti. Non mordere te stesso!</div>
+    <button class="big-btn" onclick="startGame()">GIOCA</button>
+  </div>
+</div>
+<div id="dpad">
+  <div class="drow">
+    <div class="dk de"></div>
+    <div class="dk" ontouchstart="d('U')" onclick="d('U')">^</div>
+    <div class="dk de"></div>
+  </div>
+  <div class="drow">
+    <div class="dk" ontouchstart="d('L')" onclick="d('L')">&lt;</div>
+    <div class="dk de"></div>
+    <div class="dk" ontouchstart="d('R')" onclick="d('R')">&gt;</div>
+  </div>
+  <div class="drow">
+    <div class="dk de"></div>
+    <div class="dk" ontouchstart="d('D')" onclick="d('D')">v</div>
+    <div class="dk de"></div>
+  </div>
+</div>
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const C=18;
+let cols,rows,snake,food,dir,ndir,score,lv,loop,hi=+localStorage.getItem('s_hi')||0,run=false;
+document.getElementById('hi').textContent=hi;
+
+function sz(){const m=document.getElementById('main');cols=~~(m.clientWidth/C);rows=~~(m.clientHeight/C);cv.width=cols*C;cv.height=rows*C;}
+
+function startGame(){
+  document.getElementById('ov').style.display='none';
+  sz();
+  snake=[{x:~~(cols/2),y:~~(rows/2)}];
+  dir={x:1,y:0};ndir={x:1,y:0};score=0;lv=1;
+  food=rndFood();run=true;
+  document.getElementById('sval').textContent=0;
+  document.getElementById('lv').textContent=1;
+  clearInterval(loop);loop=setInterval(tick,160);
+}
+
+function rndFood(){
+  let p;do{p={x:~~(Math.random()*cols),y:~~(Math.random()*rows)}}
+  while(snake.some(s=>s.x===p.x&&s.y===p.y));return p;
+}
+
+function d(k){
+  if(!run)return;
+  const m={U:{x:0,y:-1},D:{x:0,y:1},L:{x:-1,y:0},R:{x:1,y:0}};
+  const n=m[k];if(n.x!==-dir.x||n.y!==-dir.y)ndir=n;
+}
+
+function tick(){
+  dir=ndir;
+  const h={x:(snake[0].x+dir.x+cols)%cols,y:(snake[0].y+dir.y+rows)%rows};
+  if(snake.some(s=>s.x===h.x&&s.y===h.y)){end();return;}
+  snake.unshift(h);
+  if(h.x===food.x&&h.y===food.y){
+    score+=10*lv;document.getElementById('sval').textContent=score;
+    if(score>=lv*120){lv++;document.getElementById('lv').textContent=lv;
+      clearInterval(loop);loop=setInterval(tick,Math.max(55,160-lv*14));}
+    food=rndFood();
+  }else snake.pop();
+  draw();
+}
+
+function draw(){
+  ctx.fillStyle='#000';ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.strokeStyle='rgba(0,255,65,.05)';ctx.lineWidth=.5;
+  for(let x=0;x<=cols;x++){ctx.beginPath();ctx.moveTo(x*C,0);ctx.lineTo(x*C,cv.height);ctx.stroke();}
+  for(let y=0;y<=rows;y++){ctx.beginPath();ctx.moveTo(0,y*C);ctx.lineTo(cv.width,y*C);ctx.stroke();}
+  // food
+  ctx.shadowBlur=14;ctx.shadowColor='#ff4444';ctx.fillStyle='#ff4444';
+  ctx.fillRect(food.x*C+3,food.y*C+3,C-6,C-6);ctx.shadowBlur=0;
+  // snake
+  snake.forEach((s,i)=>{
+    const a=i===0?1:Math.max(.25,1-i/snake.length*.8);
+    ctx.fillStyle=`rgba(0,255,65,${a})`;
+    if(i===0){ctx.shadowBlur=10;ctx.shadowColor='#00ff41';}
+    ctx.fillRect(s.x*C+1,s.y*C+1,C-2,C-2);
+    ctx.shadowBlur=0;
+  });
+  // score overlay
+  ctx.fillStyle='rgba(0,255,65,.2)';ctx.font='10px Courier New';ctx.textAlign='right';
+  ctx.fillText('LEN:'+snake.length,cv.width-4,cv.height-4);
+}
+
+function end(){
+  run=false;clearInterval(loop);
+  if(score>hi){hi=score;localStorage.setItem('s_hi',hi);document.getElementById('hi').textContent=hi;}
+  document.getElementById('ot').textContent='-- FINE --';
+  document.getElementById('os').textContent='PUNTEGGIO: '+score+'   RECORD: '+hi;
+  document.querySelector('.big-btn').textContent='RIGIOCA';
+  document.getElementById('ov').style.display='flex';
+}
+
+let tx,ty;
+document.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
+document.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;
+  if(Math.abs(dx)<20&&Math.abs(dy)<20)return;
+  if(Math.abs(dx)>Math.abs(dy))d(dx>0?'R':'L');else d(dy>0?'D':'U');
+},{passive:true});
+document.addEventListener('keydown',e=>{
+  const m={ArrowUp:'U',ArrowDown:'D',ArrowLeft:'L',ArrowRight:'R'};
+  if(m[e.key])d(m[e.key]);
+});
+</script>
+</body>
+</html>
