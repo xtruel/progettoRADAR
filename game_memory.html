@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>MEMORIA</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{background:#000;color:#00ff41;font-family:'Courier New',monospace;
+  height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none;}
+#hdr{display:flex;justify-content:space-between;align-items:center;
+  padding:8px 14px;border-bottom:1px solid rgba(0,255,65,.25);flex-shrink:0;}
+#back{background:none;border:1px solid rgba(0,255,65,.4);color:#00ff41;
+  font-family:'Courier New',monospace;font-size:13px;letter-spacing:2px;
+  padding:8px 16px;border-radius:4px;cursor:pointer;}
+#back:active{background:rgba(0,255,65,.2);}
+#moves-val{font-size:clamp(22px,5vw,36px);font-weight:bold;text-shadow:0 0 12px #00ff41;}
+#main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:10px;gap:10px;overflow:hidden;}
+#grid{display:grid;gap:8px;width:100%;max-width:500px;}
+.card{background:rgba(0,255,65,.06);border:2px solid rgba(0,255,65,.35);
+  border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;aspect-ratio:1;font-size:clamp(24px,8vw,52px);}
+.card:active{transform:scale(.9);}
+.card.flipped{background:rgba(0,255,65,.15);border-color:#00ff41;
+  box-shadow:0 0 12px rgba(0,255,65,.4);}
+.card.matched{background:rgba(0,255,65,.25);border-color:#00ff41;
+  box-shadow:0 0 18px rgba(0,255,65,.6);cursor:default;}
+.card .back{opacity:0;transition:opacity .2s;font-size:inherit;}
+.card.flipped .back,.card.matched .back{opacity:1;}
+.card .front{position:absolute;font-size:inherit;}
+.card.flipped .front,.card.matched .front{opacity:0;}
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:10;}
+#ov-title{font-size:clamp(24px,6vw,44px);font-weight:bold;letter-spacing:4px;text-shadow:0 0 20px #00ff41;}
+#ov-sub{font-size:clamp(13px,3vw,18px);opacity:.7;letter-spacing:2px;text-align:center;line-height:1.8;}
+#start-btn{background:rgba(0,255,65,.12);border:3px solid #00ff41;color:#00ff41;
+  font-family:'Courier New',monospace;font-size:clamp(18px,4vw,26px);font-weight:bold;
+  letter-spacing:4px;padding:16px 44px;border-radius:8px;cursor:pointer;
+  text-shadow:0 0 12px #00ff41;box-shadow:0 0 20px rgba(0,255,65,.3);}
+#start-btn:active{background:rgba(0,255,65,.3);transform:scale(.96);}
+.diff-btns{display:flex;gap:12px;}
+.diff-btn{background:rgba(0,255,65,.08);border:2px solid rgba(0,255,65,.4);color:#00ff41;
+  font-family:'Courier New',monospace;font-size:clamp(14px,3vw,18px);letter-spacing:2px;
+  padding:12px 20px;border-radius:6px;cursor:pointer;}
+.diff-btn:active{background:rgba(0,255,65,.25);}
+.diff-btn.sel{background:rgba(0,255,65,.2);border-color:#00ff41;text-shadow:0 0 8px #00ff41;}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <button id="back" onclick="location.href='radar_control.html'">← RADAR</button>
+  <div style="text-align:center">
+    <div style="font-size:11px;opacity:.5;letter-spacing:3px">MOSSE</div>
+    <div id="moves-val">0</div>
+  </div>
+  <div style="text-align:right;font-size:clamp(10px,2vw,13px);opacity:.5">
+    COPPIE:<br><span id="pairs-left">0</span> rimaste
+  </div>
+</div>
+<div id="main">
+  <div id="grid"></div>
+</div>
+<div id="overlay">
+  <div id="ov-title">🧠 MEMORIA</div>
+  <div id="ov-sub">Trova tutte le coppie!</div>
+  <div class="diff-btns">
+    <button class="diff-btn sel" onclick="selDiff(4,this)">FACILE<br><small>4×4</small></button>
+    <button class="diff-btn" onclick="selDiff(5,this)">MEDIO<br><small>4×5</small></button>
+    <button class="diff-btn" onclick="selDiff(6,this)">DIFFICILE<br><small>4×6</small></button>
+  </div>
+  <button id="start-btn" onclick="startGame()">▶ GIOCA</button>
+</div>
+<script>
+const ICONS=['🚀','✈️','🛸','🌙','⭐','💫','☄️','🪐','🌍','🔭','🛰️','⚡','🔥','💎','🎯','🏆','🦊','🐉','🦁','🐯','🎮','🎲','🃏','🎴'];
+let cards=[],flipped=[],moves=0,pairs=0,totalPairs=0,locked=false;
+let gridCols=4, gridRows=4, difficulty=4;
+
+function selDiff(d,btn){
+  difficulty=d;
+  document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+
+function startGame(){
+  document.getElementById('overlay').style.display='none';
+  gridCols=4;
+  gridRows=difficulty;
+  totalPairs=(gridCols*gridRows)/2;
+  moves=0; pairs=0; locked=false;
+  document.getElementById('moves-val').textContent=0;
+  document.getElementById('pairs-left').textContent=totalPairs;
+  buildGrid();
+}
+
+function buildGrid(){
+  const grid=document.getElementById('grid');
+  grid.style.gridTemplateColumns=`repeat(${gridCols},1fr)`;
+  const n=gridCols*gridRows;
+  const pool=ICONS.slice(0,n/2);
+  let deck=[...pool,...pool].sort(()=>Math.random()-.5);
+  cards=[];
+  grid.innerHTML='';
+  deck.forEach((icon,i)=>{
+    const card=document.createElement('div');
+    card.className='card';
+    card.innerHTML=`<span class="front" style="font-size:clamp(18px,5vw,36px)">◈</span><span class="back">${icon}</span>`;
+    card.dataset.icon=icon; card.dataset.idx=i;
+    card.addEventListener('click',()=>flipCard(card));
+    grid.appendChild(card);
+    cards.push({el:card,icon,matched:false,flipped:false});
+  });
+}
+
+function flipCard(card){
+  if(locked) return;
+  const idx=parseInt(card.dataset.idx);
+  const c=cards[idx];
+  if(c.matched||c.flipped) return;
+  c.flipped=true; card.classList.add('flipped');
+  flipped.push(idx);
+  if(flipped.length===2){
+    moves++; document.getElementById('moves-val').textContent=moves;
+    locked=true;
+    setTimeout(checkMatch,700);
+  }
+}
+
+function checkMatch(){
+  const [a,b]=flipped;
+  if(cards[a].icon===cards[b].icon){
+    cards[a].matched=cards[b].matched=true;
+    cards[a].el.classList.add('matched');
+    cards[b].el.classList.add('matched');
+    pairs++;
+    document.getElementById('pairs-left').textContent=totalPairs-pairs;
+    if(pairs===totalPairs){
+      setTimeout(()=>{
+        document.getElementById('ov-title').textContent='🏆 BRAVO!';
+        document.getElementById('ov-sub').textContent=`Completato in ${moves} mosse!`;
+        document.getElementById('start-btn').textContent='▶ RIGIOCA';
+        document.getElementById('overlay').style.display='flex';
+      },600);
+    }
+  } else {
+    cards[a].flipped=cards[b].flipped=false;
+    cards[a].el.classList.remove('flipped');
+    cards[b].el.classList.remove('flipped');
+  }
+  flipped=[];
+  locked=false;
+}
+</script>
+</body>
+</html>
