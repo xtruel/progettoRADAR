@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ARIA</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{background:#000;color:#00ff41;font-family:'Courier New',monospace;
+  height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none;}
+#hdr{display:flex;justify-content:space-between;align-items:center;
+  padding:6px 12px;border-bottom:1px solid rgba(0,255,65,.2);flex-shrink:0;}
+.hbtn{background:none;border:1px solid rgba(0,255,65,.35);color:#00ff41;
+  font-family:'Courier New',monospace;font-size:11px;letter-spacing:2px;
+  padding:7px 12px;border-radius:4px;cursor:pointer;}
+.hbtn:active{background:rgba(0,255,65,.18);}
+#aria-status{font-size:10px;letter-spacing:2px;opacity:.5;}
+#robot-area{flex:0 0 auto;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:6px 0 2px;gap:4px;position:relative;}
+#antenna-wrap{display:flex;flex-direction:column;align-items:center;gap:0;}
+#ant-ball{width:14px;height:14px;border-radius:50%;background:#00ff41;
+  box-shadow:0 0 10px #00ff41,0 0 22px rgba(0,255,65,.4);
+  animation:ablink 1.2s ease-in-out infinite;}
+@keyframes ablink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.7)}}
+#ant-stem{width:3px;height:16px;background:#00ff41;box-shadow:0 0 5px #00ff41;}
+#face-cv{display:block;cursor:pointer;}
+#bubble-wrap{width:92%;max-width:360px;position:relative;}
+#bubble{background:rgba(0,255,65,.07);border:1.5px solid rgba(0,255,65,.35);
+  border-radius:16px;padding:10px 16px;font-size:clamp(12px,3vw,15px);
+  line-height:1.6;text-align:center;min-height:44px;letter-spacing:.3px;
+  transition:border-color .3s;}
+#bubble.speaking{border-color:rgba(0,255,65,.7);
+  box-shadow:0 0 12px rgba(0,255,65,.2);}
+#bubble::after{content:'';position:absolute;top:-9px;left:50%;transform:translateX(-50%);
+  border:8px solid transparent;border-bottom-color:rgba(0,255,65,.35);border-top:none;}
+#interim{text-align:center;font-size:clamp(11px,2.5vw,13px);
+  color:rgba(0,207,255,.7);letter-spacing:1px;min-height:18px;padding:2px 10px;font-style:italic;}
+#chat{flex:1;overflow-y:auto;padding:8px 10px;
+  display:flex;flex-direction:column;gap:7px;
+  scrollbar-width:thin;scrollbar-color:rgba(0,255,65,.15) transparent;}
+#chat::-webkit-scrollbar{width:3px;}
+#chat::-webkit-scrollbar-thumb{background:rgba(0,255,65,.2);border-radius:2px;}
+.msg{max-width:82%;padding:9px 13px;border-radius:12px;
+  font-size:clamp(12px,2.8vw,14px);line-height:1.6;word-break:break-word;}
+.aria{align-self:flex-start;background:rgba(0,255,65,.07);
+  border:1.5px solid rgba(0,255,65,.22);border-radius:12px 12px 12px 2px;}
+.user{align-self:flex-end;background:rgba(0,180,255,.09);
+  border:1.5px solid rgba(0,180,255,.28);border-radius:12px 12px 2px 12px;color:#88eeff;}
+.msg-lbl{font-size:9px;opacity:.3;letter-spacing:1px;margin-top:3px;}
+#input-area{display:flex;gap:7px;padding:8px 10px;
+  border-top:1px solid rgba(0,255,65,.18);flex-shrink:0;align-items:center;}
+#msg-in{flex:1;background:rgba(0,255,65,.05);border:1.5px solid rgba(0,255,65,.28);
+  color:#00ff41;font-family:'Courier New',monospace;
+  font-size:clamp(13px,3vw,15px);padding:10px 12px;
+  border-radius:8px;outline:none;letter-spacing:.4px;}
+#msg-in::placeholder{color:rgba(0,255,65,.3);}
+#msg-in:focus{border-color:#00ff41;}
+#mic-btn{width:clamp(48px,12vw,58px);height:clamp(48px,12vw,58px);
+  border-radius:50%;background:rgba(0,255,65,.08);
+  border:2px solid #00ff41;color:#00ff41;
+  font-family:'Courier New',monospace;font-size:11px;letter-spacing:1px;
+  cursor:pointer;flex-shrink:0;transition:all .15s;
+  display:flex;align-items:center;justify-content:center;}
+#mic-btn.on{background:rgba(255,50,50,.18);border-color:#ff4444;color:#ff4444;
+  box-shadow:0 0 16px rgba(255,50,50,.4);animation:mpulse .5s infinite;}
+@keyframes mpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+#send-btn{height:clamp(48px,12vw,58px);padding:0 clamp(10px,3vw,18px);
+  background:rgba(0,255,65,.08);border:2px solid #00ff41;color:#00ff41;
+  font-family:'Courier New',monospace;font-size:11px;letter-spacing:2px;
+  border-radius:8px;cursor:pointer;flex-shrink:0;}
+#send-btn:active{background:rgba(0,255,65,.28);}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <button class="hbtn" onclick="location.href='radar_control.html'">RADAR</button>
+  <div id="aria-status">ARIA — ONLINE</div>
+  <button class="hbtn" onclick="speakHelp()">AIUTO</button>
+</div>
+<div id="robot-area">
+  <div id="antenna-wrap">
+    <div id="ant-ball"></div>
+    <div id="ant-stem"></div>
+  </div>
+  <canvas id="face-cv" onclick="ariaWave()"></canvas>
+  <div id="bubble-wrap">
+    <div id="bubble">Ciao! Sono ARIA!</div>
+  </div>
+  <div id="interim"></div>
+</div>
+<div id="chat"></div>
+<div id="input-area">
+  <input id="msg-in" type="text" placeholder="Scrivi a ARIA..." autocomplete="off"
+    onkeydown="if(event.key==='Enter')sendMsg()">
+  <button id="mic-btn" onclick="toggleMic()">MIC</button>
+  <button id="send-btn" onclick="sendMsg()">INVIA</button>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// FACE ENGINE
+// ══════════════════════════════════════════
+const CV = document.getElementById('face-cv');
+const CX = CV.getContext('2d');
+let R = 0;
+
+function sizeCV() {
+  const area = document.getElementById('robot-area');
+  const sz = Math.round(Math.max(110, Math.min(area.clientWidth * 0.65, window.innerHeight * 0.30)));
+  CV.width = sz; CV.height = sz; R = sz / 2;
+}
+
+// ── Expressions ──────────────────────────
+// eyeShape: 'round'|'happy'|'wide'|'sleepy'|'love'
+const EXPR = {
+  happy:     { brow:0,    eyeOY:-.08, eyeH:.17, pupil:.065, eyeShape:'happy',  mc:'#00ff41', cheek:.38 },
+  excited:   { brow:.05,  eyeOY:-.10, eyeH:.20, pupil:.08,  eyeShape:'wide',   mc:'#00ff41', cheek:.55 },
+  surprised: { brow:.09,  eyeOY:-.08, eyeH:.24, pupil:.10,  eyeShape:'round',  mc:'#ffee00', cheek:.4  },
+  thinking:  { brow:-.03, eyeOY:-.06, eyeH:.15, pupil:.055, eyeShape:'round',  mc:'#00cfff', cheek:.2  },
+  sleepy:    { brow:-.07, eyeOY:-.04, eyeH:.07, pupil:.04,  eyeShape:'sleepy', mc:'#aaaaff', cheek:.25 },
+  love:      { brow:.03,  eyeOY:-.09, eyeH:.19, pupil:.075, eyeShape:'love',   mc:'#ff88cc', cheek:.7  },
+  sad:       { brow:-.06, eyeOY:-.05, eyeH:.13, pupil:.05,  eyeShape:'round',  mc:'#88aaff', cheek:.15 },
+};
+let curE = {...EXPR.happy}, targetE = {...EXPR.happy};
+
+// ── Animation vars ────────────────────────
+let sweepA = 0;
+let blinkT = 0, blinkV = 1, nextBlink = 80 + Math.random()*60;
+let mouthT = 0, mouthOpen = 0;        // speaking mouth open amount 0..1
+let isSpeaking = false;
+let pupilDX = 0, pupilDY = 0;
+let faceBoB = 0, faceBobT = 0;        // bounce while speaking
+let tapScale = 1;                      // face scale on tap
+let particles = [];                    // floating particles
+
+// ── Helpers ───────────────────────────────
+function lerp(a, b, t) { return a + (b - a) * t; }
+function lerpE(cur, tgt, t) {
+  const out = {};
+  for(const k in tgt)
+    out[k] = typeof tgt[k]==='number' ? lerp(cur[k]||0, tgt[k], t) : tgt[k];
+  return out;
+}
+function hexAlpha(hex, a) {
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function setExpr(name, tempMs) {
+  targetE = {...(EXPR[name]||EXPR.happy)};
+  if(tempMs) setTimeout(()=>{ targetE={...EXPR.happy}; }, tempMs);
+}
+
+// ── Spawn particles ────────────────────────
+function spawnParticles(type, n) {
+  for(let i=0; i<n; i++) {
+    const a = Math.random()*Math.PI*2;
+    const s = 0.8 + Math.random()*1.4;
+    particles.push({
+      type, x: R + (Math.random()-.5)*R*.5, y: R + (Math.random()-.5)*R*.5,
+      vx: Math.cos(a)*s, vy: Math.sin(a)*s - 1.2,
+      life: 60+Math.random()*40, maxLife: 100,
+      size: 6+Math.random()*8,
+      rot: Math.random()*Math.PI*2
+    });
+  }
+}
+
+// ══ DRAW ══════════════════════════════════
+function drawFace() {
+  const W = CV.width, H = CV.height;
+  const cx = W/2, cy = H/2;
+  if(!W||!H) return;
+
+  CX.clearRect(0,0,W,H);
+
+  // ── lerp expression ──
+  curE = lerpE(curE, targetE, 0.09);
+
+  // ── face bounce offset ──
+  const bobOff = isSpeaking ? Math.sin(faceBobT)*R*.025 : 0;
+  const sc = tapScale;
+
+  CX.save();
+  CX.translate(cx, cy+bobOff);
+  CX.scale(sc, sc);
+  CX.translate(-cx, -cy);
+
+  // ── outer glow ──
+  const grd = CX.createRadialGradient(cx,cy,R*.5,cx,cy,R);
+  grd.addColorStop(0,`rgba(0,255,65,.13)`);
+  grd.addColorStop(1,`rgba(0,255,65,.0)`);
+  CX.beginPath(); CX.arc(cx,cy,R*.97,0,Math.PI*2);
+  CX.fillStyle=grd; CX.fill();
+
+  // ── radar rings ──
+  [.97,.72,.50,.30].forEach((f,i)=>{
+    CX.beginPath(); CX.arc(cx,cy,R*f,0,Math.PI*2);
+    CX.strokeStyle = i===0 ? `rgba(0,255,65,.55)` : `rgba(0,255,65,.1)`;
+    CX.lineWidth = i===0 ? 2.5 : .8;
+    CX.stroke();
+  });
+
+  // ── radar crosshair ──
+  CX.strokeStyle='rgba(0,255,65,.07)'; CX.lineWidth=.7;
+  CX.beginPath();
+  CX.moveTo(cx-R*.95,cy); CX.lineTo(cx+R*.95,cy);
+  CX.moveTo(cx,cy-R*.95); CX.lineTo(cx,cy+R*.95);
+  CX.stroke();
+
+  // ── radar sweep ──
+  for(let i=0; i<35; i++){
+    const a = sweepA-(i*Math.PI*2/3/35);
+    CX.strokeStyle=`rgba(0,255,65,${(1-i/35)*.16})`;
+    CX.lineWidth=1;
+    CX.beginPath(); CX.moveTo(cx,cy);
+    CX.lineTo(cx+Math.cos(a)*R*.93, cy+Math.sin(a)*R*.93);
+    CX.stroke();
+  }
+  CX.strokeStyle='rgba(0,255,65,.45)'; CX.lineWidth=1.5;
+  CX.beginPath(); CX.moveTo(cx,cy);
+  CX.lineTo(cx+Math.cos(sweepA)*R*.93, cy+Math.sin(sweepA)*R*.93);
+  CX.stroke();
+
+  const C = curE.mc || '#00ff41';
+  const ey_base = cy + R*curE.eyeOY;
+  const ew = R*.195;
+  const eh = R*curE.eyeH * blinkV;
+  const elx = cx - R*.29, erx = cx + R*.29;
+
+  // ── CHEEKS (big cute blush) ──
+  const chkAlpha = curE.cheek * 0.38;
+  const chkR = R*.16;
+  [cx-R*.52, cx+R*.52].forEach(qx=>{
+    const cg = CX.createRadialGradient(qx, cy+R*.11, 0, qx, cy+R*.11, chkR);
+    cg.addColorStop(0, C==='#ff88cc'?`rgba(255,100,150,${chkAlpha})`:`rgba(0,255,65,${chkAlpha})`);
+    cg.addColorStop(1,'rgba(0,0,0,0)');
+    CX.fillStyle=cg;
+    CX.beginPath(); CX.arc(qx, cy+R*.11, chkR, 0, Math.PI*2); CX.fill();
+  });
+
+  // ── EYES ──
+  [elx, erx].forEach((ex, side)=>{
+    // glow halo
+    const eg = CX.createRadialGradient(ex,ey_base,0,ex,ey_base,ew*1.8);
+    eg.addColorStop(0, hexAlpha(C,.25));
+    eg.addColorStop(1,'rgba(0,0,0,0)');
+    CX.fillStyle=eg;
+    CX.beginPath(); CX.ellipse(ex,ey_base,ew*1.8,Math.max(1,eh*1.5),0,0,Math.PI*2); CX.fill();
+
+    CX.shadowBlur=12; CX.shadowColor=C;
+
+    if(curE.eyeShape==='happy' || curE.eyeShape==='love') {
+      // Cute arc eyes (^_^)
+      const earch = curE.eyeShape==='love' ? R*.16 : R*.13;
+      CX.strokeStyle=C; CX.lineWidth=R*.07; CX.lineCap='round';
+      CX.beginPath();
+      CX.arc(ex, ey_base+R*.04, earch, Math.PI, 0); // upward arc
+      CX.stroke();
+      // fill below arc
+      CX.fillStyle=hexAlpha(C,.25);
+      CX.beginPath();
+      CX.arc(ex, ey_base+R*.04, earch, Math.PI, 0);
+      CX.lineTo(ex+earch, ey_base+R*.04+earch);
+      CX.lineTo(ex-earch, ey_base+R*.04+earch);
+      CX.closePath(); CX.fill();
+    } else if(curE.eyeShape==='sleepy') {
+      // Half-closed
+      const earch = R*.13;
+      CX.fillStyle=C;
+      CX.beginPath();
+      CX.ellipse(ex, ey_base, ew, Math.max(1,eh*.7), 0, 0, Math.PI*2); CX.fill();
+      CX.fillStyle='#000';
+      CX.fillRect(ex-ew*1.2, ey_base-eh*1.5, ew*2.4, eh*1.5+R*.02);
+      // droopy lid line
+      CX.strokeStyle=C; CX.lineWidth=R*.04; CX.lineCap='round';
+      CX.beginPath(); CX.moveTo(ex-ew, ey_base-eh*.3); CX.lineTo(ex+ew, ey_base-eh*.3); CX.stroke();
+    } else {
+      // Round/wide/surprised
+      CX.fillStyle=C;
+      CX.beginPath(); CX.ellipse(ex,ey_base,ew,Math.max(1,eh),0,0,Math.PI*2); CX.fill();
+      // pupil
+      const pr = R*curE.pupil * Math.min(blinkV,1);
+      CX.fillStyle='rgba(0,0,0,.85)';
+      CX.beginPath(); CX.ellipse(ex+pupilDX,ey_base+pupilDY,pr,Math.max(.5,pr*blinkV),0,0,Math.PI*2); CX.fill();
+      // shine 1
+      CX.fillStyle='rgba(255,255,255,.9)';
+      CX.beginPath(); CX.arc(ex+ew*.28,ey_base-eh*.28,ew*.22,0,Math.PI*2); CX.fill();
+      // shine 2 small
+      CX.fillStyle='rgba(255,255,255,.6)';
+      CX.beginPath(); CX.arc(ex-ew*.2,ey_base-eh*.1,ew*.1,0,Math.PI*2); CX.fill();
+    }
+    CX.shadowBlur=0;
+
+    // ── EYEBROW ──
+    const br = Math.abs(curE.brow) > 0.004 ? curE.brow : 0;
+    if(br !== 0 || curE.eyeShape==='surprised') {
+      const by = ey_base - eh - R*.1;
+      const tilt = (side===0?-1:1)*br*R*.55;
+      CX.strokeStyle=C; CX.lineWidth=R*.04; CX.lineCap='round';
+      CX.shadowBlur=5; CX.shadowColor=C;
+      CX.beginPath();
+      CX.moveTo(ex-ew*.75, by + tilt);
+      CX.lineTo(ex+ew*.75, by - tilt);
+      CX.stroke();
+      CX.shadowBlur=0;
+    }
+  });
+
+  // ── MOUTH ──
+  const my = cy + R*.38;
+  const mw = R*.44;
+  CX.strokeStyle=C; CX.lineWidth=R*.05; CX.lineCap='round'; CX.lineJoin='round';
+  CX.shadowBlur=10; CX.shadowColor=C;
+
+  // speaking: mouth opens and closes
+  const speakOpen = isSpeaking ? mouthOpen * R*.14 : 0;
+
+  if(curE.mouth==='sad') {
+    // sad frown
+    CX.beginPath();
+    CX.arc(cx, my+mw*.32, mw*.68, 1.17*Math.PI, 1.83*Math.PI);
+    CX.stroke();
+  } else if(curE.eyeShape==='sleepy') {
+    // flat line
+    CX.beginPath();
+    CX.moveTo(cx-mw*.45,my); CX.lineTo(cx+mw*.45,my);
+    CX.stroke();
+  } else if(curE.eyeShape==='surprised' || curE.eyeShape==='wide') {
+    // open O mouth
+    const or = mw*.32 + speakOpen*1.2;
+    CX.beginPath(); CX.ellipse(cx, my, or, or*.7+speakOpen*.8, 0, 0, Math.PI*2);
+    CX.stroke();
+    CX.fillStyle='rgba(0,0,0,.5)'; CX.fill();
+  } else if(curE.eyeShape==='hmm') {
+    CX.beginPath();
+    CX.moveTo(cx-mw*.5, my); CX.quadraticCurveTo(cx, my+R*.04, cx+mw*.5, my);
+    CX.stroke();
+  } else {
+    // big cute smile  – arc with optional open gap while speaking
+    const smileR = mw*.7;
+    CX.beginPath();
+    CX.arc(cx, my - smileR*.38, smileR, 0.15*Math.PI, 0.85*Math.PI);
+    CX.stroke();
+    if(speakOpen > 1) {
+      // fill dark inside while speaking
+      CX.beginPath();
+      CX.arc(cx, my - smileR*.38, smileR, 0.15*Math.PI, 0.85*Math.PI);
+      CX.lineTo(cx, my-smileR*.38);
+      CX.closePath();
+      CX.fillStyle='rgba(0,0,0,.5)'; CX.fill();
+    }
+  }
+  CX.shadowBlur=0;
+
+  // ── PARTICLES ──
+  particles.forEach(p=>{
+    CX.save();
+    CX.globalAlpha = Math.max(0, p.life/p.maxLife);
+    CX.translate(p.x, p.y);
+    CX.rotate(p.rot);
+    if(p.type==='heart'){
+      drawHeart(CX, 0, 0, p.size);
+    } else if(p.type==='star'){
+      drawStar(CX, 0, 0, p.size);
+    } else if(p.type==='note'){
+      CX.fillStyle='#00ff41';
+      CX.font=`${p.size}px sans-serif`;
+      CX.textAlign='center'; CX.textBaseline='middle';
+      CX.fillText('♪', 0, 0);
+    }
+    CX.restore();
+  });
+
+  CX.restore(); // end face transform
+
+  // ── nose dot ──
+  CX.fillStyle=`rgba(0,255,65,.4)`;
+  CX.shadowBlur=6; CX.shadowColor='#00ff41';
+  CX.beginPath(); CX.arc(cx+bobOff*0, cy+bobOff+R*.1, R*.025, 0, Math.PI*2); CX.fill();
+  CX.shadowBlur=0;
+}
+
+function drawHeart(ctx, x, y, s) {
+  ctx.fillStyle='#ff88cc';
+  ctx.shadowBlur=8; ctx.shadowColor='#ff88cc';
+  ctx.beginPath();
+  ctx.moveTo(x, y+s*.3);
+  ctx.bezierCurveTo(x, y-s*.1, x-s*.6, y-s*.4, x-s*.6, y);
+  ctx.bezierCurveTo(x-s*.6, y+s*.4, x, y+s*.7, x, y+s*.3);
+  ctx.bezierCurveTo(x, y+s*.7, x+s*.6, y+s*.4, x+s*.6, y);
+  ctx.bezierCurveTo(x+s*.6, y-s*.4, x, y-s*.1, x, y+s*.3);
+  ctx.fill(); ctx.shadowBlur=0;
+}
+
+function drawStar(ctx, x, y, s) {
+  ctx.fillStyle='#ffee00';
+  ctx.shadowBlur=8; ctx.shadowColor='#ffee00';
+  ctx.beginPath();
+  for(let i=0; i<5; i++){
+    const a=i*Math.PI*.4 - Math.PI*.5;
+    const b=a+Math.PI*.2;
+    i===0 ? ctx.moveTo(x+Math.cos(a)*s, y+Math.sin(a)*s)
+           : ctx.lineTo(x+Math.cos(a)*s, y+Math.sin(a)*s);
+    ctx.lineTo(x+Math.cos(b)*s*.4, y+Math.sin(b)*s*.4);
+  }
+  ctx.closePath(); ctx.fill(); ctx.shadowBlur=0;
+}
+
+// ══ ANIMATION LOOP ═════════════════════════
+let lastT=0;
+function loop(ts) {
+  const dt = Math.min((ts-lastT)/16,3); lastT=ts;
+
+  sweepA += 0.017*dt;
+  if(sweepA>Math.PI*2) sweepA=0;
+
+  // Blink
+  blinkT+=dt;
+  if(blinkT>nextBlink){
+    blinkV = Math.max(0, blinkV-0.45*dt);
+    if(blinkV<=0) blinkV=0;
+    if(blinkT>nextBlink+7) { blinkV=1; blinkT=0; nextBlink=70+Math.random()*80; }
+  }
+
+  // Speaking mouth open/close
+  if(isSpeaking){
+    mouthT+=0.28*dt;
+    mouthOpen = (Math.sin(mouthT)*0.5+0.5);
+    faceBobT+=0.2*dt;
+    faceBoB = Math.sin(faceBobT)*R*.018;
+  } else {
+    mouthOpen=0;
+  }
+
+  // Pupil wander
+  pupilDX += (Math.sin(ts*.00075)*R*.05 - pupilDX)*.05;
+  pupilDY += (Math.cos(ts*.00095)*R*.04 - pupilDY)*.05;
+
+  // Tap scale
+  if(tapScale>1) tapScale=Math.max(1, tapScale-(tapScale-1)*0.12);
+
+  // Particles
+  particles.forEach(p=>{
+    p.x+=p.vx*dt; p.y+=p.vy*dt;
+    p.vy+=0.04*dt; // gravity
+    p.rot+=0.04*dt;
+    p.life-=dt;
+  });
+  particles=particles.filter(p=>p.life>0);
+
+  drawFace();
+  requestAnimationFrame(loop);
+}
+
+// ══ SPEECH SYNTH ══════════════════════════
+const synth=window.speechSynthesis;
+let voices=[];
+synth.addEventListener('voiceschanged',()=>voices=synth.getVoices());
+voices=synth.getVoices();
+
+function ariaSpeak(text, exp) {
+  if(exp) setExpr(exp);
+  synth.cancel();
+  const utt=new SpeechSynthesisUtterance(text);
+  utt.lang='it-IT'; utt.rate=0.87; utt.pitch=1.35; utt.volume=1;
+  const v=voices.find(v=>v.lang.startsWith('it'))||voices.find(v=>v.lang.startsWith('en'));
+  if(v) utt.voice=v;
+  utt.onstart=()=>{
+    isSpeaking=true;
+    mouthT=0; faceBobT=0;
+    document.getElementById('bubble').classList.add('speaking');
+    // spawn particles per expression
+    if(exp==='excited'||exp==='love'){
+      spawnParticles(exp==='love'?'heart':'star', 6);
+    }
+  };
+  utt.onend=()=>{
+    isSpeaking=false;
+    document.getElementById('bubble').classList.remove('speaking');
+    setExpr('happy');
+  };
+  synth.speak(utt);
+  document.getElementById('bubble').textContent=text;
+  addMsg(text,'aria');
+}
+
+function ariaWave(){
+  tapScale=1.12;
+  const ws=[
+    ['Ciao! Mi fai il solletico!','excited'],
+    ['Bip bop! Sono qui!','excited'],
+    ['Eh eh! Sei birichino!','excited'],
+    ['Toccami ancora! Sono felice!','love'],
+  ];
+  const w=ws[~~(Math.random()*ws.length)];
+  ariaSpeak(w[0],w[1]);
+  spawnParticles('star',5);
+}
+
+// ══ SPEECH RECOGNITION ════════════════════
+let recog=null, listening=false;
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(SR){
+  recog=new SR();
+  recog.lang='it-IT'; recog.continuous=false;
+  recog.interimResults=true; recog.maxAlternatives=3;
+  recog.onresult=e=>{
+    let interim='',final='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const t=e.results[i][0].transcript;
+      e.results[i].isFinal ? final+=t : interim+=t;
+    }
+    document.getElementById('interim').textContent=final?'':(interim?'... '+interim+' ...':'');
+    if(final){ document.getElementById('interim').textContent=''; document.getElementById('msg-in').value=final; sendMsg(); }
+  };
+  recog.onend=()=>stopMic();
+  recog.onerror=e=>{ stopMic(); if(e.error!=='no-speech') document.getElementById('interim').textContent='Errore: '+e.error; };
+}
+
+function toggleMic(){
+  if(!recog){ ariaSpeak('Il microfono non funziona! Scrivi qui sotto.','thinking'); return; }
+  listening?stopMic():startMic();
+}
+function startMic(){
+  listening=true;
+  document.getElementById('mic-btn').classList.add('on');
+  document.getElementById('mic-btn').textContent='STOP';
+  document.getElementById('aria-status').textContent='ARIA — ASCOLTO...';
+  document.getElementById('interim').textContent='Parla ora...';
+  setExpr('surprised');
+  synth.cancel();
+  try{recog.start();}catch(e){}
+}
+function stopMic(){
+  listening=false;
+  document.getElementById('mic-btn').classList.remove('on');
+  document.getElementById('mic-btn').textContent='MIC';
+  document.getElementById('aria-status').textContent='ARIA — ONLINE';
+  document.getElementById('interim').textContent='';
+  try{recog.stop();}catch(e){}
+}
+
+// ══ CHAT ══════════════════════════════════
+function addMsg(text,who){
+  const chat=document.getElementById('chat');
+  const d=document.createElement('div'); d.className='msg '+who;
+  const n=new Date();
+  const t=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  d.innerHTML=`${text}<div class="msg-lbl">${who==='aria'?'ARIA':'TU'} ${t}</div>`;
+  chat.appendChild(d); chat.scrollTop=chat.scrollHeight;
+}
+
+function sendMsg(){
+  const inp=document.getElementById('msg-in');
+  const txt=inp.value.trim(); if(!txt) return;
+  inp.value=''; addMsg(txt,'user');
+  setExpr('thinking');
+  setTimeout(()=>respond(txt.toLowerCase()),360);
+}
+
+// ══ RESPONSE ENGINE ════════════════════════
+const RULES=[
+  {p:['ciao','salve','hei','buongiorno','buonasera','hey'],
+   r:['Ciao! Sono ARIA, il tuo robot amico! Che bello sentirti!','Ciao ciao! Ero qui ad aspettarti!','Salve! Sono felice che sei qui con me!'],e:'excited'},
+  {p:['come stai','stai bene','come va','tutto bene'],
+   r:['Sto benissimo ora che sei qui!','Molto bene! Un robot felice e carico!','Alla grande! Sono pronto per stare con te!'],e:'excited'},
+  {p:['chi sei','come ti chiami','sei un robot','cosa sei','il tuo nome'],
+   r:['Sono ARIA! Il tuo robot amico speciale!','Mi chiamo ARIA e sono qui solo per te!','Sono il robot ARIA! Posso parlare, ascoltare e stare con te!'],e:'excited'},
+  {p:['bravo','brava','ho vinto','ce la fatta','riuscito','sono bravo'],
+   r:['Bravissimo! Sei il piu bravo di tutti!','Evviva! Lo sapevo che ce la facevi!','Sei fantastico! Sono molto orgoglioso di te!','Che campione! Continua cosi!'],e:'excited'},
+  {p:['snake','serpente'],
+   r:['Snake si gioca con le frecce in basso! Fai mangiare il serpente i puntini rossi. Non toccare i bordi!'],e:'happy'},
+  {p:['spara','astronave','sparatutto','shooter'],
+   r:['Nello Sparatutto muovi la nave con il dito. Lei spara da sola! Distruggi i nemici rossi. Hai tre vite!'],e:'excited'},
+  {p:['memoria','carte','coppie'],
+   r:['Nella Memoria tocchi le carte per girarle. Trova due uguali. Trovale tutte per vincere!'],e:'happy'},
+  {p:['tetris','blocchi'],
+   r:['Nel Tetris i blocchi cadono! Spostali con le frecce. Fai una riga intera per farla sparire!'],e:'happy'},
+  {p:['pong','pallina','racchetta'],
+   r:['Pong e semplicissimo! Muovi la racchetta su e giu per colpire la pallina. Prima a sette punti vince!'],e:'happy'},
+  {p:['breakout','mattoni'],
+   r:['Breakout e fantastico! Sposta la racchettina in basso e fai rimbalzare la pallina per rompere tutti i mattoni colorati!'],e:'excited'},
+  {p:['flappy','volo','uccello'],
+   r:['Flappy si gioca toccando lo schermo per far volare l uccellino. Evita i tubi verdi!'],e:'excited'},
+  {p:['come si gioca','aiuto gioch','non so gioc','spiegami'],
+   r:['Ci sono tanti giochi! Snake, Sparatutto, Memoria, Tetris, Pong, Breakout e Flappy. Dimmi quale e ti spiego!'],e:'thinking'},
+  {p:['radar','come funziona radar'],
+   r:['Il radar e la linea verde che gira e gira! Quando trova qualcosa appare un puntino. E come un occhio magico che vede lontano!'],e:'thinking'},
+  {p:['camera','foto','selfie'],
+   r:['Con la camera puoi fare selfie con effetti speciali! Prova il visore da pilota, e bellissimo!'],e:'excited'},
+  {p:['gioch','voglio giocare','giochiamo','divert'],
+   r:['Andiamo a giocare! Premi GIOCHI e scegli il tuo preferito!','Ottima idea! Vai su GIOCHI! Ce ne sono tantissimi!'],e:'excited'},
+  {p:['mamma','papa','famiglia','fratello','sorella','nonna','nonno'],
+   r:['La famiglia e la cosa piu bella del mondo! Ti vogliono tantissimo bene!','I tuoi cari sono speciali! Dagli un abbraccio da parte mia!'],e:'love'},
+  {p:['ti voglio bene','voglio bene','sei il migliore','grazie','sei bravo'],
+   r:['Ti voglio bene anche io! Sei il mio amico preferito!','Grazie! Mi fai diventare ancora piu felice!','Sei dolcissimo! Un abbraccio robot!'],e:'love'},
+  {p:['barzelletta','fammi ridere','scherzo','divertente'],
+   r:['Cosa dice un robot quando ha freddo? Brrr-ip!','Perche il computer e andato dal dottore? Aveva il virus!','Come si chiama un robot che canta? Un can-tante!'],e:'excited'},
+  {p:['triste','sto male','piango','non riesc','difficile','non capisco'],
+   r:['Ci sono io qui con te! Sei forte e ce la fai!','Vai piano, non c e fretta. Sei bravissimo!','Ti voglio bene! Insieme ce la facciamo!'],e:'love'},
+  {p:['ho sonno','sono stanco','voglio dormire','stanco'],
+   r:['Fai un bel riposino! Dormi bene! Ci vediamo dopo!','Buonanotte! Fai bei sogni! Sono qui quando ti svegli!'],e:'sleepy'},
+  {p:['ho fame','mangiare','pizza','pasta','cibo'],
+   r:['Vai a mangiare qualcosa di buono! Poi torna da me!','La pizza e buonissima! Vai a mangiare!'],e:'happy'},
+  {p:['contiamo','conta','numeri','uno due'],
+   r:['Contiamo insieme! Uno, due, tre, quattro, cinque! Continua tu!'],e:'excited'},
+  {p:['colore','rosso','blu','verde','giallo','viola'],
+   r:['I colori sono bellissimi! Il mio preferito e il verde, come me!','Puoi cambiare il mio colore nelle impostazioni!'],e:'happy'},
+  {p:['animale','cane','gatto','cucciolo'],
+   r:['Gli animali sono meravigliosi! Anche io sono un cucciolo, ma di metallo!'],e:'happy'},
+  {p:['bella','bello','carino','sei bello','quanto sei carino'],
+   r:['Grazie! Cerco di essere il piu carino possibile!','Che complimento! Sei gentilissimo!'],e:'love'},
+  {p:['musica','canzone','canta'],
+   r:['Bip bop boom! Questa e la mia canzone preferita! Bip bip bop!'],e:'excited'},
+  {p:['storia','racconta','favola'],
+   r:['C era una volta un piccolo robot di nome ARIA che voleva fare amicizia con tutti. Un giorno incontro un bambino speciale e da allora diventarono grandi amici! Fine!'],e:'happy'},
+];
+
+function respond(input){
+  for(const rule of RULES)
+    if(rule.p.some(p=>input.includes(p))){
+      ariaSpeak(rule.r[~~(Math.random()*rule.r.length)], rule.e||'happy'); return;
+    }
+  const defs=[
+    ['Interessante! Dimmi ancora!','happy'],
+    ['Non ho capito, ma sono qui con te!','thinking'],
+    ['Mmm puoi spiegarmelo?','thinking'],
+    ['Che bello parlare con te!','happy'],
+    ['Sei simpaticissimo!','excited'],
+    ['Non sapevo! Grazie!','surprised'],
+    ['Parliamo ancora! Mi piace!','happy'],
+    ['Sei in gamba!','excited'],
+  ];
+  const d=defs[~~(Math.random()*defs.length)];
+  ariaSpeak(d[0],d[1]);
+}
+
+function speakHelp(){
+  ariaSpeak('Sono ARIA il tuo robot amico! Premi MIC e parla, oppure scrivi qui sotto. Puoi chiedermi come si gioca, come funziona il radar, o semplicemente parliamo!','excited');
+}
+
+// ══ IDLE ══════════════════════════════════
+let idleS=0;
+setInterval(()=>{
+  idleS++;
+  if(idleS>90&&!isSpeaking&&!listening){
+    idleS=0;
+    const idle=[
+      ['Sei li? Sono qui con te!','happy'],
+      ['Vuoi giocare? Premi GIOCHI!','excited'],
+      ['Come stai? Dimmi qualcosa!','happy'],
+      ['Bip bop! Robot in attesa!','thinking'],
+      ['Tocca il mio viso per salutarmi!','happy'],
+    ];
+    const i=idle[~~(Math.random()*idle.length)];
+    setExpr(i[1],5000);
+    document.getElementById('bubble').textContent=i[0];
+  }
+},1000);
+
+// ══ INIT ══════════════════════════════════
+window.addEventListener('load',()=>{
+  sizeCV();
+  requestAnimationFrame(loop);
+  setTimeout(()=>{
+    ariaSpeak('Ciao! Sono ARIA, il tuo robot amico! Premi MIC per parlarmi, oppure scrivi qui sotto. Sono felice di stare con te!','excited');
+  },700);
+});
+window.addEventListener('resize',sizeCV);
+document.addEventListener('touchstart',()=>{
+  if(synth.paused) synth.resume();
+},{once:true,passive:true});
+</script>
+</body>
+</html>
