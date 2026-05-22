@@ -35,13 +35,38 @@ body::after{content:'';position:fixed;inset:0;
 .page.active{display:flex;}
 
 /* NAV */
-#nav{display:flex;border-top:1px solid rgba(var(--crgb),.2);flex-shrink:0;}
-.nbtn{flex:1;background:none;border:none;border-right:1px solid rgba(var(--crgb),.12);
-  color:var(--c);font-family:'Courier New',monospace;font-size:clamp(9px,2vw,13px);
-  letter-spacing:1px;padding:9px 4px;cursor:pointer;opacity:.45;transition:all .2s;}
+#nav{
+  display:flex;flex-shrink:0;
+  border-top:1px solid rgba(var(--crgb),.18);
+  background:rgba(0,0,0,.5);
+  position:relative;
+}
+#nav::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(var(--crgb),.35),transparent);
+}
+.nbtn{
+  flex:1;background:none;border:none;
+  border-right:1px solid rgba(var(--crgb),.1);
+  color:var(--c);font-family:'Courier New',monospace;
+  font-size:clamp(8px,1.7vw,12px);letter-spacing:1.5px;
+  padding:8px 4px 7px;cursor:pointer;opacity:.38;
+  transition:all .18s;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  position:relative;overflow:hidden;
+}
 .nbtn:last-child{border-right:none;}
-.nbtn.active{opacity:1;background:rgba(var(--crgb),.08);text-shadow:0 0 8px var(--c);}
-.nbtn:active{opacity:1;}
+.nbtn .nicon{font-size:clamp(10px,2vw,14px);line-height:1;}
+.nbtn .nlbl{font-size:clamp(7px,1.3vw,10px);letter-spacing:2px;}
+.nbtn.active{
+  opacity:1;background:rgba(var(--crgb),.07);
+  text-shadow:0 0 8px var(--c);
+}
+.nbtn.active::after{
+  content:'';position:absolute;top:0;left:15%;right:15%;height:2px;
+  background:var(--c);box-shadow:0 0 8px var(--c);border-radius:0 0 3px 3px;
+}
+.nbtn:active{opacity:1;background:rgba(var(--crgb),.14);}
 
 /* ══ RADAR PAGE ══ */
 #radar-canvas{display:block;flex-shrink:0;}
@@ -51,8 +76,21 @@ body::after{content:'';position:fixed;inset:0;
 .tdot{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.25);
   cursor:pointer;transition:transform .15s;}
 .tdot:active{transform:scale(1.4);}
-#radar-btns{position:absolute;bottom:8px;left:0;right:0;
-  display:flex;justify-content:center;gap:8px;z-index:10;}
+#radar-btns{
+  position:absolute;bottom:6px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:stretch;gap:0;z-index:10;
+  border:1px solid rgba(var(--crgb),.35);border-radius:8px;
+  background:rgba(0,0,0,.72);backdrop-filter:blur(4px);
+  box-shadow:0 0 18px rgba(var(--crgb),.12),inset 0 1px 0 rgba(var(--crgb),.08);
+  overflow:hidden;
+}
+/* corner bracket accents */
+#radar-btns::before,#radar-btns::after{
+  content:'';position:absolute;width:8px;height:8px;
+  border-color:var(--c);border-style:solid;opacity:.7;
+}
+#radar-btns::before{top:-1px;left:-1px;border-width:2px 0 0 2px;border-radius:6px 0 0 0;}
+#radar-btns::after{bottom:-1px;right:-1px;border-width:0 2px 2px 0;border-radius:0 0 6px 0;}
 
 /* HUD side panels */
 .hud-panel{flex:1;height:100%;display:flex;flex-direction:column;gap:7px;
@@ -92,13 +130,34 @@ canvas.wave-cv{display:block;}
   color:var(--c);font-family:'Courier New',monospace;font-size:clamp(8px,1vw,10px);
   padding:3px 6px;border-radius:4px;cursor:pointer;letter-spacing:.5px;}
 .mini-quick:active{background:rgba(var(--crgb),.22);}
-.rbtn{background:rgba(var(--crgb),.1);border:2px solid var(--c);color:var(--c);
-  font-family:'Courier New',monospace;font-size:clamp(13px,3vw,18px);font-weight:bold;
-  letter-spacing:2px;padding:12px 22px;border-radius:6px;cursor:pointer;
-  text-shadow:0 0 8px var(--c);transition:all .15s;}
-.rbtn:active{background:rgba(var(--crgb),.3);transform:scale(.95);}
+/* ── Generic rbtn (used outside radar-btns) ── */
+.rbtn{background:rgba(var(--crgb),.1);border:1.5px solid rgba(var(--crgb),.55);color:var(--c);
+  font-family:'Courier New',monospace;font-size:clamp(11px,2.4vw,15px);font-weight:bold;
+  letter-spacing:2px;padding:11px 20px;border-radius:6px;cursor:pointer;
+  text-shadow:0 0 7px var(--c);transition:all .15s;position:relative;}
+.rbtn:active{background:rgba(var(--crgb),.28);transform:scale(.95);}
 .rbtn.danger{border-color:#ff3333;color:#ff3333;text-shadow:0 0 8px #ff3333;}
 .rbtn.danger:active{background:rgba(255,51,51,.25);}
+
+/* ── Cockpit-style buttons inside #radar-btns ── */
+#radar-btns .rbtn{
+  border:none;border-right:1px solid rgba(var(--crgb),.2);border-radius:0;
+  padding:0;margin:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;
+  width:clamp(72px,14vw,110px);height:clamp(40px,6vh,54px);
+  font-size:clamp(8px,1.5vw,11px);letter-spacing:2px;
+  background:transparent;transition:background .15s;
+}
+#radar-btns .rbtn:last-child{border-right:none;}
+#radar-btns .rbtn:active{background:rgba(var(--crgb),.18);transform:none;}
+#radar-btns .rbtn .rbtn-icon{
+  font-size:clamp(12px,2.5vw,18px);line-height:1;
+  text-shadow:0 0 10px var(--c);
+}
+#radar-btns .rbtn .rbtn-lbl{
+  font-size:clamp(7px,1.2vw,10px);letter-spacing:2.5px;opacity:.75;
+}
 
 /* Radar discovery overlay */
 #alert-overlay{position:absolute;inset:0;background:rgba(0,255,65,.06);
@@ -305,9 +364,18 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
         <div class="tdot" style="background:#cc00ff" onclick="setTheme('#cc00ff','204,0,255')"></div>
       </div>
       <div id="radar-btns">
-        <button class="rbtn" onclick="showPage('games')">GIOCA</button>
-        <button class="rbtn" onclick="triggerAlert()">SCOPERTA</button>
-        <button class="rbtn" onclick="addRandomBlip()">+ SEGNALE</button>
+        <button class="rbtn" onclick="showPage('games')">
+          <span class="rbtn-icon">▶</span>
+          <span class="rbtn-lbl">GIOCA</span>
+        </button>
+        <button class="rbtn" onclick="triggerAlert()" style="width:clamp(90px,18vw,140px);">
+          <span class="rbtn-icon" id="rbtns-disc" style="font-size:clamp(9px,1.5vw,12px);letter-spacing:1.5px;opacity:.9;">◈ SCOPERTA</span>
+          <span class="rbtn-lbl" id="rbtns-clock" style="opacity:.5;font-size:clamp(7px,1.1vw,10px);letter-spacing:2px;">--:--:--</span>
+        </button>
+        <button class="rbtn" onclick="addRandomBlip()">
+          <span class="rbtn-icon">⊕</span>
+          <span class="rbtn-lbl">SEGNALE</span>
+        </button>
       </div>
     </div>
 
@@ -560,11 +628,21 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
 
 <!-- NAV -->
 <div id="nav">
-  <button class="nbtn active" id="nav-radar" onclick="showPage('radar')">◉ RADAR</button>
-  <button class="nbtn" id="nav-cam" onclick="showPage('cam')">CAM</button>
-  <button class="nbtn" id="nav-games" onclick="showPage('games')">GIOCHI</button>
-  <button class="nbtn" onclick="location.href='bot_aria.html'">★ ARIA</button>
-  <button class="nbtn" id="nav-settings" onclick="reqPin('settings')">SET</button>
+  <button class="nbtn active" id="nav-radar" onclick="showPage('radar')">
+    <span class="nicon">◉</span><span class="nlbl">RADAR</span>
+  </button>
+  <button class="nbtn" id="nav-cam" onclick="showPage('cam')">
+    <span class="nicon">◎</span><span class="nlbl">CAM</span>
+  </button>
+  <button class="nbtn" id="nav-games" onclick="showPage('games')">
+    <span class="nicon">▶</span><span class="nlbl">GIOCHI</span>
+  </button>
+  <button class="nbtn" onclick="location.href='bot_aria.html'">
+    <span class="nicon">★</span><span class="nlbl">ARIA</span>
+  </button>
+  <button class="nbtn" id="nav-settings" onclick="reqPin('settings')">
+    <span class="nicon">⚙</span><span class="nlbl">SET</span>
+  </button>
 </div>
 
 <!-- PIN OVERLAY -->
@@ -655,10 +733,12 @@ const DAYS=['DOM','LUN','MAR','MER','GIO','VEN','SAB'];
 const MNTHS=['GEN','FEB','MAR','APR','MAG','GIU','LUG','AGO','SET','OTT','NOV','DIC'];
 function updateClock(){
   const n=new Date();
-  document.getElementById('clock').textContent=
-    `${p2(n.getHours())}:${p2(n.getMinutes())}:${p2(n.getSeconds())}`;
+  const ts=`${p2(n.getHours())}:${p2(n.getMinutes())}:${p2(n.getSeconds())}`;
+  document.getElementById('clock').textContent=ts;
   document.getElementById('date').textContent=
     `${DAYS[n.getDay()]} ${n.getDate()} ${MNTHS[n.getMonth()]} ${n.getFullYear()}`;
+  const rc=document.getElementById('rbtns-clock');
+  if(rc) rc.textContent=ts;
 }
 function p2(n){return String(n).padStart(2,'0');}
 setInterval(updateClock,1000); updateClock();
