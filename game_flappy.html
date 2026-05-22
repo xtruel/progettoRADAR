@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>FLAPPY</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{background:#000;color:#00ff41;font-family:'Courier New',monospace;
+  height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none;}
+#hdr{display:flex;justify-content:space-between;align-items:center;
+  padding:8px 14px;border-bottom:1px solid rgba(0,255,65,.25);flex-shrink:0;}
+.hbtn{background:none;border:1px solid rgba(0,255,65,.4);color:#00ff41;
+  font-family:'Courier New',monospace;font-size:12px;letter-spacing:2px;
+  padding:8px 14px;border-radius:4px;cursor:pointer;}
+.hbtn:active{background:rgba(0,255,65,.2);}
+#sval{font-size:clamp(20px,5vw,34px);font-weight:bold;text-shadow:0 0 10px #00ff41;}
+#main{flex:1;position:relative;overflow:hidden;}
+canvas{display:block;width:100%;height:100%;}
+#ov{position:absolute;inset:0;background:rgba(0,0,0,.9);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:10;}
+.ov-t{font-size:clamp(22px,6vw,42px);font-weight:bold;letter-spacing:4px;text-shadow:0 0 18px #00ff41;}
+.ov-s{font-size:clamp(12px,2.5vw,16px);opacity:.6;letter-spacing:2px;text-align:center;line-height:1.8;}
+.big-btn{background:rgba(0,255,65,.1);border:3px solid #00ff41;color:#00ff41;
+  font-family:'Courier New',monospace;font-size:clamp(16px,4vw,24px);font-weight:bold;
+  letter-spacing:4px;padding:16px 44px;border-radius:8px;cursor:pointer;
+  text-shadow:0 0 10px #00ff41;box-shadow:0 0 18px rgba(0,255,65,.3);}
+.big-btn:active{background:rgba(0,255,65,.3);transform:scale(.96);}
+#tap-hint{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);
+  font-size:14px;letter-spacing:3px;opacity:.5;}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <button class="hbtn" onclick="location.href='radar_control.html'">RADAR</button>
+  <div style="text-align:center">
+    <div style="font-size:10px;opacity:.45;letter-spacing:3px">PUNTEGGIO</div>
+    <div id="sval">0</div>
+  </div>
+  <div style="text-align:right;font-size:11px;opacity:.45">
+    REC <span id="hi">0</span>
+  </div>
+</div>
+<div id="main">
+  <canvas id="cv"></canvas>
+  <div id="ov">
+    <div class="ov-t">-- FLAPPY --</div>
+    <div class="ov-s">TOCCA lo schermo<br>per volare!</div>
+    <button class="big-btn" onclick="startGame()">GIOCA</button>
+  </div>
+  <div id="tap-hint">TOCCA PER VOLARE</div>
+</div>
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+let W,H,bird,pipes,score,run=false,raf,last=0,started=false;
+let hi=+localStorage.getItem('fl_hi')||0;
+document.getElementById('hi').textContent=hi;
+
+const GAP=160,PIPE_W=52,PIPE_SPEED=2.8;
+const GRAVITY=0.45,FLAP=-7;
+
+function resize(){
+  const m=document.getElementById('main');
+  W=cv.width=m.clientWidth;H=cv.height=m.clientHeight;
+}
+
+function startGame(){
+  document.getElementById('ov').style.display='none';
+  resize();
+  bird={x:W*.25,y:H/2,vy:0,r:14,angle:0};
+  pipes=[];score=0;run=true;started=false;
+  document.getElementById('sval').textContent=0;
+  document.getElementById('tap-hint').style.display='block';
+  cancelAnimationFrame(raf);last=performance.now();
+  raf=requestAnimationFrame(loop);
+}
+
+function flap(){
+  if(!run)return;
+  if(!started){started=true;document.getElementById('tap-hint').style.display='none';}
+  bird.vy=FLAP;
+}
+
+function spawnPipe(){
+  const minH=60,maxH=H-GAP-60;
+  const topH=minH+Math.random()*(maxH-minH);
+  pipes.push({x:W,topH,scored:false});
+}
+
+let pipeTimer=0;
+function loop(ts){
+  if(!run)return;
+  const dt=Math.min((ts-last)/16,3);last=ts;
+  update(dt);draw();
+  raf=requestAnimationFrame(loop);
+}
+
+function update(dt){
+  if(!started)return;
+
+  bird.vy+=GRAVITY*dt;
+  bird.y+=bird.vy*dt;
+  bird.angle=Math.max(-0.4,Math.min(1.2,bird.vy/20));
+
+  pipeTimer-=dt;
+  if(pipeTimer<=0){spawnPipe();pipeTimer=90+Math.random()*30;}
+
+  pipes.forEach(p=>{p.x-=PIPE_SPEED*dt;});
+  pipes=pipes.filter(p=>p.x>-PIPE_W-10);
+
+  // score
+  pipes.forEach(p=>{
+    if(!p.scored&&p.x+PIPE_W<bird.x){
+      p.scored=true;score++;
+      document.getElementById('sval').textContent=score;
+    }
+  });
+
+  // collisions
+  const bx=bird.x,by=bird.y,br=bird.r-3;
+  if(by-br<=0||by+br>=H){end();return;}
+  for(const p of pipes){
+    if(bx+br>p.x&&bx-br<p.x+PIPE_W){
+      if(by-br<p.topH||by+br>p.topH+GAP){end();return;}
+    }
+  }
+}
+
+function draw(){
+  // bg - moving stars
+  ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(0,255,65,.15)';
+  for(let i=0;i<30;i++){
+    const sx=(i*173+Date.now()*.05)%W;
+    const sy=(i*97)%H;
+    ctx.fillRect(sx,sy,1,1);
+  }
+
+  // pipes
+  pipes.forEach(p=>{
+    // top pipe
+    ctx.shadowBlur=8;ctx.shadowColor='#00ff41';
+    ctx.fillStyle='rgba(0,180,60,0.85)';
+    ctx.fillRect(p.x,0,PIPE_W,p.topH);
+    ctx.fillStyle='#00ff41';
+    ctx.fillRect(p.x-4,p.topH-18,PIPE_W+8,18);
+    // bottom pipe
+    const botY=p.topH+GAP;
+    ctx.fillStyle='rgba(0,180,60,0.85)';
+    ctx.fillRect(p.x,botY,PIPE_W,H-botY);
+    ctx.fillStyle='#00ff41';
+    ctx.fillRect(p.x-4,botY,PIPE_W+8,18);
+    ctx.shadowBlur=0;
+  });
+
+  // bird
+  ctx.save();
+  ctx.translate(bird.x,bird.y);
+  ctx.rotate(bird.angle);
+  ctx.shadowBlur=14;ctx.shadowColor='#00ff41';
+  // body
+  ctx.fillStyle='#00ff41';
+  ctx.beginPath();ctx.ellipse(0,0,bird.r,bird.r*.75,0,0,Math.PI*2);ctx.fill();
+  // eye
+  ctx.fillStyle='#000';ctx.beginPath();ctx.arc(6,-2,4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(7,-3,1.5,0,Math.PI*2);ctx.fill();
+  // beak
+  ctx.fillStyle='#ffaa00';
+  ctx.beginPath();ctx.moveTo(bird.r,1);ctx.lineTo(bird.r+8,3);ctx.lineTo(bird.r,5);ctx.closePath();ctx.fill();
+  // wing
+  ctx.fillStyle='rgba(0,200,50,0.6)';
+  ctx.beginPath();ctx.ellipse(-2,4,8,4,bird.vy*0.05,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.restore();
+
+  // score in canvas
+  if(!started){
+    ctx.fillStyle='rgba(0,255,65,.4)';
+    ctx.font=`bold ${Math.min(W*.06,28)}px Courier New`;
+    ctx.textAlign='center';
+    ctx.fillText('TOCCA PER INIZIARE',W/2,H/2+60);
+  }
+}
+
+function end(){
+  run=false;
+  if(score>hi){hi=score;localStorage.setItem('fl_hi',hi);document.getElementById('hi').textContent=hi;}
+  document.querySelector('.ov-t').textContent=score>0?'-- BRAVO! --':'-- FINE --';
+  document.querySelector('.ov-s').textContent='PUNTEGGIO: '+score+'   RECORD: '+hi;
+  document.querySelector('.big-btn').textContent='RIGIOCA';
+  document.getElementById('ov').style.display='flex';
+}
+
+cv.addEventListener('click',flap);
+cv.addEventListener('touchstart',e=>{e.preventDefault();flap();},{passive:false});
+document.addEventListener('keydown',e=>{if(e.code==='Space'||e.key==='ArrowUp'){e.preventDefault();flap();}});
+</script>
+</body>
+</html>
