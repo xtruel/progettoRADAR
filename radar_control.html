@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+<title>RADAR CONTROL</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{--c:#00ff41;--crgb:0,255,65;--bright:1;}
+body{background:#000;color:var(--c);font-family:'Courier New',monospace;
+  height:100vh;width:100vw;overflow:hidden;display:flex;flex-direction:column;
+  filter:brightness(var(--bright));user-select:none;}
+body::after{content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.04) 3px,rgba(0,0,0,0.04) 4px);
+  pointer-events:none;z-index:9998;}
+
+/* HEADER */
+#hdr{display:flex;justify-content:space-between;align-items:center;
+  padding:5px 12px;border-bottom:1px solid rgba(var(--crgb),.25);flex-shrink:0;}
+#clock{font-size:clamp(20px,4.5vw,36px);font-weight:bold;letter-spacing:3px;
+  text-shadow:0 0 14px var(--c);}
+#date{font-size:clamp(8px,1.8vw,12px);opacity:.5;letter-spacing:2px;}
+#htitle{font-size:clamp(10px,2.2vw,15px);letter-spacing:3px;opacity:.8;text-align:center;
+  text-shadow:0 0 8px var(--c);cursor:pointer;}
+#sys{font-size:clamp(8px,1.6vw,11px);opacity:.5;text-align:right;line-height:1.7;}
+
+/* MAIN */
+#main{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.page{display:none;width:100%;height:100%;align-items:center;justify-content:center;flex-direction:column;}
+.page.active{display:flex;}
+
+/* NAV */
+#nav{display:flex;border-top:1px solid rgba(var(--crgb),.2);flex-shrink:0;}
+.nbtn{flex:1;background:none;border:none;border-right:1px solid rgba(var(--crgb),.12);
+  color:var(--c);font-family:'Courier New',monospace;font-size:clamp(9px,2vw,13px);
+  letter-spacing:1px;padding:9px 4px;cursor:pointer;opacity:.45;transition:all .2s;}
+.nbtn:last-child{border-right:none;}
+.nbtn.active{opacity:1;background:rgba(var(--crgb),.08);text-shadow:0 0 8px var(--c);}
+.nbtn:active{opacity:1;}
+
+/* ══ RADAR PAGE ══ */
+#radar-canvas{display:block;flex-shrink:0;}
+#page-radar{position:relative;flex-direction:row;align-items:center;justify-content:center;gap:0;}
+#radar-center{position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+#themes{position:absolute;top:6px;right:6px;display:flex;gap:6px;z-index:10;}
+.tdot{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.25);
+  cursor:pointer;transition:transform .15s;}
+.tdot:active{transform:scale(1.4);}
+#radar-btns{position:absolute;bottom:8px;left:0;right:0;
+  display:flex;justify-content:center;gap:8px;z-index:10;}
+
+/* HUD side panels */
+.hud-panel{flex:1;height:100%;display:flex;flex-direction:column;gap:7px;
+  padding:10px 8px;overflow:hidden;min-width:0;}
+.hud-box{border:1px solid rgba(var(--crgb),.2);border-radius:6px;
+  padding:8px 10px;background:rgba(var(--crgb),.03);flex-shrink:0;}
+.hud-title{font-size:clamp(8px,1.3vw,11px);letter-spacing:3px;opacity:.4;margin-bottom:6px;
+  border-bottom:1px solid rgba(var(--crgb),.1);padding-bottom:4px;}
+.hud-row{display:flex;justify-content:space-between;align-items:center;
+  font-size:clamp(9px,1.4vw,12px);padding:2px 0;letter-spacing:1px;}
+.hud-lbl{opacity:.45;}
+.hud-val{opacity:.9;text-shadow:0 0 6px var(--c);}
+.hud-val.blink{animation:blink .7s infinite;}
+.hud-bar-wrap{width:100%;height:5px;background:rgba(var(--crgb),.1);
+  border-radius:3px;margin-top:3px;overflow:hidden;}
+.hud-bar{height:100%;background:var(--c);border-radius:3px;
+  box-shadow:0 0 6px var(--c);transition:width .4s;}
+.hud-tgt{font-size:clamp(8px,1.2vw,11px);letter-spacing:1px;padding:3px 0;
+  display:flex;justify-content:space-between;border-bottom:1px solid rgba(var(--crgb),.07);}
+.hud-tgt:last-child{border-bottom:none;}
+.hud-tgt.locked{color:#ff3333;text-shadow:0 0 6px #ff3333;}
+.mini-wave{width:100%;height:28px;overflow:hidden;}
+canvas.wave-cv{display:block;}
+.sig-dots{display:flex;gap:3px;align-items:flex-end;height:18px;}
+.sig-dot{width:5px;background:var(--c);border-radius:2px;box-shadow:0 0 4px var(--c);}
+/* hide panels on very small screens */
+@media(max-width:480px){.hud-panel{display:none;}}
+/* Mini chat */
+.mini-msg{font-size:clamp(8px,1.15vw,11px);padding:4px 7px;border-radius:6px;
+  line-height:1.5;word-break:break-word;max-width:92%;}
+.mini-aria{align-self:flex-start;background:rgba(var(--crgb),.07);
+  border:1px solid rgba(var(--crgb),.2);border-radius:6px 6px 6px 1px;}
+.mini-user{align-self:flex-end;background:rgba(0,180,255,.1);
+  border:1px solid rgba(0,180,255,.25);border-radius:6px 6px 1px 6px;
+  color:#88eeff;}
+.mini-quick{background:rgba(var(--crgb),.06);border:1px solid rgba(var(--crgb),.25);
+  color:var(--c);font-family:'Courier New',monospace;font-size:clamp(8px,1vw,10px);
+  padding:3px 6px;border-radius:4px;cursor:pointer;letter-spacing:.5px;}
+.mini-quick:active{background:rgba(var(--crgb),.22);}
+.rbtn{background:rgba(var(--crgb),.1);border:2px solid var(--c);color:var(--c);
+  font-family:'Courier New',monospace;font-size:clamp(13px,3vw,18px);font-weight:bold;
+  letter-spacing:2px;padding:12px 22px;border-radius:6px;cursor:pointer;
+  text-shadow:0 0 8px var(--c);transition:all .15s;}
+.rbtn:active{background:rgba(var(--crgb),.3);transform:scale(.95);}
+.rbtn.danger{border-color:#ff3333;color:#ff3333;text-shadow:0 0 8px #ff3333;}
+.rbtn.danger:active{background:rgba(255,51,51,.25);}
+
+/* Radar discovery overlay */
+#alert-overlay{position:absolute;inset:0;background:rgba(0,255,65,.06);
+  display:none;z-index:5;pointer-events:none;
+  animation:discpulse 0.6s infinite;}
+@keyframes discpulse{0%,100%{opacity:1}50%{opacity:.1}}
+#alert-msg{position:absolute;top:18%;left:50%;transform:translateX(-50%);
+  font-size:clamp(16px,4.5vw,28px);font-weight:bold;letter-spacing:4px;
+  color:#00ff41;text-shadow:0 0 24px #00ff41;display:none;z-index:6;
+  animation:discpulse .5s infinite;text-align:center;pointer-events:none;
+  white-space:nowrap;}
+
+/* ══ CAMERA PAGE ══ */
+#page-cam{background:#000;position:relative;flex-direction:row;align-items:stretch;gap:0;}
+#cam-main{flex:1;position:relative;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;overflow:hidden;min-width:0;}
+#cam-canvas{display:block;max-width:100%;max-height:calc(100vh - 170px);}
+#cam-video{display:none;}
+#cam-controls{display:flex;flex-direction:column;gap:4px;
+  padding:6px;position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.5);}
+.cfx-btn{background:rgba(var(--crgb),.08);border:1px solid rgba(var(--crgb),.4);
+  color:var(--c);font-family:'Courier New',monospace;font-size:clamp(9px,1.8vw,13px);
+  padding:7px 10px;border-radius:5px;cursor:pointer;letter-spacing:1px;transition:all .15s;}
+.cfx-btn.active{background:rgba(var(--crgb),.25);border-color:var(--c);
+  text-shadow:0 0 8px var(--c);}
+.cfx-btn:active{transform:scale(.95);}
+/* Gallery panel */
+#cam-gallery{width:clamp(90px,18vw,140px);flex-shrink:0;
+  border-left:1px solid rgba(var(--crgb),.15);
+  display:flex;flex-direction:column;overflow:hidden;background:rgba(0,0,0,.4);}
+#gallery-hdr{padding:7px 6px 5px;border-bottom:1px solid rgba(var(--crgb),.15);
+  font-size:clamp(8px,1.3vw,11px);letter-spacing:2px;opacity:.5;text-align:center;flex-shrink:0;}
+#gallery-list{flex:1;overflow-y:auto;padding:6px;display:flex;
+  flex-direction:column;gap:6px;
+  scrollbar-width:thin;scrollbar-color:rgba(0,255,65,.1) transparent;}
+#gallery-list::-webkit-scrollbar{width:2px;}
+#gallery-list::-webkit-scrollbar-thumb{background:rgba(0,255,65,.15);}
+.gal-item{position:relative;flex-shrink:0;border:1px solid rgba(var(--crgb),.2);
+  border-radius:5px;overflow:hidden;cursor:pointer;transition:border-color .15s;}
+.gal-item:hover,.gal-item:active{border-color:rgba(var(--crgb),.7);}
+.gal-item img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;
+  filter:sepia(.3) hue-rotate(80deg);}
+.gal-del{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.7);
+  border:1px solid rgba(255,60,60,.5);color:#ff4444;font-size:11px;font-weight:bold;
+  width:18px;height:18px;border-radius:3px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;line-height:1;}
+.gal-del:active{background:rgba(255,60,60,.4);}
+.gal-time{font-size:8px;opacity:.35;letter-spacing:.5px;
+  padding:2px 4px;text-align:center;}
+#gallery-empty{font-size:clamp(8px,1.2vw,10px);opacity:.3;
+  text-align:center;padding:12px 4px;letter-spacing:1px;line-height:1.8;}
+@media(max-width:480px){#cam-gallery{display:none;}}
+#cam-err{display:flex;color:rgba(var(--crgb),.6);font-size:14px;letter-spacing:2px;text-align:center;padding:20px;}
+#snap-btn:active{background:rgba(var(--crgb),.3);}
+#snap-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;
+  transition:opacity .1s;z-index:20;}
+
+/* ══ GAMES PAGE ══ */
+#page-games{padding:10px;gap:12px;overflow-y:auto;}
+.g-section{width:100%;max-width:520px;}
+.g-title{font-size:clamp(10px,2vw,13px);letter-spacing:3px;opacity:.5;margin-bottom:8px;}
+.g-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.gbtn{background:rgba(var(--crgb),.06);border:2px solid rgba(var(--crgb),.45);
+  color:var(--c);font-family:'Courier New',monospace;
+  font-size:clamp(11px,2.5vw,15px);letter-spacing:1px;
+  padding:clamp(14px,3vh,22px) 6px;border-radius:8px;cursor:pointer;
+  text-align:center;transition:all .15s;}
+.gbtn:active{background:rgba(var(--crgb),.25);transform:scale(.95);}
+.gbtn .ico{font-size:clamp(14px,3.5vw,22px);display:block;margin-bottom:4px;font-weight:bold;letter-spacing:1px;}
+#btn-retroarch{width:100%;max-width:520px;
+  background:rgba(var(--crgb),.1);border:3px solid var(--c);color:var(--c);
+  font-family:'Courier New',monospace;font-size:clamp(18px,4.5vw,28px);
+  font-weight:bold;letter-spacing:4px;padding:20px;border-radius:8px;cursor:pointer;
+  text-align:center;text-shadow:0 0 14px var(--c);
+  box-shadow:0 0 20px rgba(var(--crgb),.3);transition:all .15s;}
+#btn-retroarch:active{background:rgba(var(--crgb),.3);transform:scale(.97);}
+
+/* ══ SETTINGS PAGE (PS style) ══ */
+#page-settings{flex-direction:column;padding:0;overflow:hidden;}
+#ps-cats{display:flex;gap:0;border-bottom:1px solid rgba(var(--crgb),.2);flex-shrink:0;}
+.ps-cat{flex:1;padding:14px 4px;text-align:center;cursor:pointer;
+  font-size:clamp(18px,4vw,28px);opacity:.4;transition:all .2s;border-bottom:2px solid transparent;}
+.ps-cat.active{opacity:1;border-bottom-color:var(--c);
+  text-shadow:0 0 12px var(--c);}
+#ps-body{flex:1;overflow-y:auto;padding:20px;}
+.ps-panel{display:none;}
+.ps-panel.active{display:block;}
+.ps-row{display:flex;align-items:center;justify-content:space-between;
+  padding:16px 0;border-bottom:1px solid rgba(var(--crgb),.1);}
+.ps-label{font-size:clamp(13px,2.8vw,18px);letter-spacing:2px;opacity:.8;}
+.ps-sub{font-size:clamp(10px,2vw,13px);opacity:.45;letter-spacing:1px;margin-top:3px;}
+input[type=range]{-webkit-appearance:none;appearance:none;
+  width:160px;height:6px;background:rgba(var(--crgb),.2);
+  border-radius:3px;outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
+  width:22px;height:22px;border-radius:50%;background:var(--c);
+  box-shadow:0 0 8px var(--c);cursor:pointer;}
+.ps-toggle{width:52px;height:28px;background:rgba(var(--crgb),.15);
+  border:2px solid rgba(var(--crgb),.4);border-radius:14px;
+  cursor:pointer;position:relative;transition:all .2s;}
+.ps-toggle.on{background:rgba(var(--crgb),.4);border-color:var(--c);}
+.ps-toggle::after{content:'';position:absolute;top:2px;left:2px;
+  width:20px;height:20px;border-radius:50%;background:rgba(var(--crgb),.5);
+  transition:left .2s;}
+.ps-toggle.on::after{left:26px;background:var(--c);box-shadow:0 0 8px var(--c);}
+.color-row{display:flex;gap:10px;flex-wrap:wrap;}
+.cdot{width:36px;height:36px;border-radius:50%;cursor:pointer;
+  border:3px solid rgba(255,255,255,.2);transition:transform .15s;}
+.cdot:active{transform:scale(1.3);}
+
+/* ══ PIN OVERLAY ══ */
+#pin-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);
+  z-index:1000;flex-direction:column;align-items:center;justify-content:center;gap:20px;}
+#pin-overlay.show{display:flex;}
+#pin-title{font-size:clamp(14px,3vw,20px);letter-spacing:4px;opacity:.7;}
+#pin-dots{display:flex;gap:14px;}
+.pin-dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--c);
+  background:transparent;transition:background .1s;}
+.pin-dot.filled{background:var(--c);box-shadow:0 0 8px var(--c);}
+#pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(280px,70vw);}
+.pkey{background:rgba(var(--crgb),.08);border:2px solid rgba(var(--crgb),.4);
+  color:var(--c);font-family:'Courier New',monospace;
+  font-size:clamp(20px,5vw,30px);font-weight:bold;padding:18px;
+  border-radius:8px;cursor:pointer;text-align:center;transition:all .1s;letter-spacing:1px;}
+.pkey:active{background:rgba(var(--crgb),.3);transform:scale(.92);}
+.pkey.del{font-size:clamp(16px,3.5vw,22px);}
+#pin-msg{font-size:13px;letter-spacing:2px;opacity:.5;height:18px;}
+#pin-cancel{background:none;border:1px solid rgba(var(--crgb),.3);color:var(--c);
+  font-family:'Courier New',monospace;font-size:13px;letter-spacing:2px;
+  padding:10px 24px;border-radius:4px;cursor:pointer;opacity:.5;}
+#pin-cancel:active{opacity:1;}
+
+/* MISC */
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+.blink{animation:blink .6s infinite;}
+@keyframes fadeout{from{opacity:1}to{opacity:0}}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="hdr">
+  <div>
+    <div id="clock">00:00:00</div>
+    <div id="date">--- -- ----</div>
+  </div>
+  <div id="htitle">◈ RADAR CTRL ◈</div>
+  <div id="sys">SYS: OK<br>LINK: ON<br><span id="tgt-cnt">TGT: 0</span></div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- RADAR -->
+  <div id="page-radar" class="page active">
+    <div id="alert-overlay"></div>
+    <div id="alert-msg">-- SCOPERTA SPECIALE --</div>
+
+    <!-- LEFT HUD PANEL -->
+    <div class="hud-panel" id="hud-left">
+      <div class="hud-box">
+        <div class="hud-title">◈ POSIZIONE</div>
+        <div class="hud-row"><span class="hud-lbl">LAT</span><span class="hud-val" id="h-lat">41.9028 N</span></div>
+        <div class="hud-row"><span class="hud-lbl">LON</span><span class="hud-val" id="h-lon">012.4964 E</span></div>
+        <div class="hud-row"><span class="hud-lbl">ALT</span><span class="hud-val" id="h-alt">1240 m</span></div>
+        <div class="hud-row"><span class="hud-lbl">HDG</span><span class="hud-val" id="h-hdg">289°</span></div>
+      </div>
+      <div class="hud-box">
+        <div class="hud-title">◈ SISTEMA</div>
+        <div class="hud-row"><span class="hud-lbl">CPU</span><span class="hud-val" id="h-cpu">72%</span></div>
+        <div class="hud-bar-wrap"><div class="hud-bar" id="bar-cpu" style="width:72%"></div></div>
+        <div class="hud-row" style="margin-top:5px"><span class="hud-lbl">MEM</span><span class="hud-val" id="h-mem">58%</span></div>
+        <div class="hud-bar-wrap"><div class="hud-bar" id="bar-mem" style="width:58%"></div></div>
+        <div class="hud-row" style="margin-top:5px"><span class="hud-lbl">LINK</span><span class="hud-val blink">ATTIVO</span></div>
+      </div>
+      <div class="hud-box">
+        <div class="hud-title">◈ SEGNALE</div>
+        <div class="hud-row"><span class="hud-lbl">FREQ</span><span class="hud-val" id="h-freq">9.35 GHz</span></div>
+        <div class="hud-row"><span class="hud-lbl">PWR</span><span class="hud-val" id="h-pwr">340 kW</span></div>
+        <div style="display:flex;justify-content:center;margin-top:6px;">
+          <div class="sig-dots" id="sig-dots">
+            <div class="sig-dot" style="height:4px"></div>
+            <div class="sig-dot" style="height:7px"></div>
+            <div class="sig-dot" style="height:11px"></div>
+            <div class="sig-dot" style="height:14px"></div>
+            <div class="sig-dot" style="height:18px"></div>
+          </div>
+        </div>
+      </div>
+      <div class="hud-box" style="flex:1">
+        <div class="hud-title">◈ ONDA</div>
+        <canvas class="wave-cv" id="wave-cv"></canvas>
+      </div>
+    </div>
+
+    <!-- RADAR CENTER -->
+    <div id="radar-center">
+      <canvas id="radar-canvas"></canvas>
+      <div id="themes">
+        <div class="tdot" style="background:#00ff41" onclick="setTheme('#00ff41','0,255,65')"></div>
+        <div class="tdot" style="background:#00cfff" onclick="setTheme('#00cfff','0,207,255')"></div>
+        <div class="tdot" style="background:#ff6a00" onclick="setTheme('#ff6a00','255,106,0')"></div>
+        <div class="tdot" style="background:#ff0066" onclick="setTheme('#ff0066','255,0,102')"></div>
+        <div class="tdot" style="background:#cc00ff" onclick="setTheme('#cc00ff','204,0,255')"></div>
+      </div>
+      <div id="radar-btns">
+        <button class="rbtn" onclick="showPage('games')">GIOCA</button>
+        <button class="rbtn" onclick="triggerAlert()">SCOPERTA</button>
+        <button class="rbtn" onclick="addRandomBlip()">+ SEGNALE</button>
+      </div>
+    </div>
+
+    <!-- RIGHT HUD PANEL -->
+    <div class="hud-panel" id="hud-right">
+      <div class="hud-box">
+        <div class="hud-title">◈ SEGNALI RILEVATI</div>
+        <div id="tgt-list"></div>
+      </div>
+      <div class="hud-box">
+        <div class="hud-title">◈ RADAR INFO</div>
+        <div class="hud-row"><span class="hud-lbl">GIRI</span><span class="hud-val" id="h-giri">0</span></div>
+        <div class="hud-row"><span class="hud-lbl">SCAN</span><span class="hud-val blink">ATTIVO</span></div>
+        <div class="hud-row"><span class="hud-lbl">RANGE</span><span class="hud-val">200 nm</span></div>
+        <div class="hud-row"><span class="hud-lbl">SEGNALI</span><span class="hud-val" id="h-segnali">0</span></div>
+      </div>
+      <div class="hud-box">
+        <div class="hud-title">◈ STAZIONE</div>
+        <div class="hud-row"><span class="hud-lbl">CANALE</span><span class="hud-val blink" id="h-cha">A-7</span></div>
+        <div class="hud-row"><span class="hud-lbl">STATO</span><span class="hud-val">ONLINE</span></div>
+        <div class="hud-row"><span class="hud-lbl">CODICE</span><span class="hud-val" id="h-enc">OMEGA</span></div>
+        <div class="hud-row"><span class="hud-lbl">TEMPO</span><span class="hud-val" id="h-up">00:00:00</span></div>
+      </div>
+      <div class="hud-box" style="flex:1;min-height:0;display:flex;flex-direction:column;">
+        <div class="hud-title" style="display:flex;align-items:center;gap:5px;">
+          <canvas id="mini-face" width="18" height="18" style="border-radius:50%;flex-shrink:0;"></canvas>
+          ◈ ARIA
+          <span id="mini-status" style="opacity:.4;font-size:8px;letter-spacing:1px;margin-left:auto;">ONLINE</span>
+        </div>
+        <div id="mini-chat" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px;
+          padding:3px 0;scrollbar-width:none;min-height:0;"></div>
+        <div style="display:flex;gap:4px;margin-top:5px;">
+          <input id="mini-in" type="text" placeholder="Scrivi..." autocomplete="off"
+            style="flex:1;background:rgba(var(--crgb),.06);border:1px solid rgba(var(--crgb),.3);
+            color:var(--c);font-family:'Courier New',monospace;font-size:clamp(9px,1.2vw,11px);
+            padding:5px 6px;border-radius:4px;outline:none;min-width:0;letter-spacing:.3px;"
+            onkeydown="if(event.key==='Enter')miniSend()">
+          <button onclick="miniSend()"
+            style="background:rgba(var(--crgb),.1);border:1px solid rgba(var(--crgb),.4);
+            color:var(--c);font-family:'Courier New',monospace;font-size:10px;
+            padding:5px 7px;border-radius:4px;cursor:pointer;flex-shrink:0;letter-spacing:1px;">OK</button>
+        </div>
+        <div style="display:flex;gap:3px;margin-top:4px;flex-wrap:wrap;">
+          <button class="mini-quick" onclick="miniQuick('Ciao!')">Ciao</button>
+          <button class="mini-quick" onclick="miniQuick('Come stai?')">Stai bene?</button>
+          <button class="mini-quick" onclick="miniQuick('Giochiamo!')">Gioca</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAMERA -->
+  <div id="page-cam" class="page">
+
+    <!-- CAMERA MAIN AREA -->
+    <div id="cam-main">
+      <video id="cam-video" autoplay playsinline muted></video>
+      <canvas id="cam-canvas"></canvas>
+      <div id="snap-flash"></div>
+      <div id="cam-err" style="display:none;flex-direction:column;align-items:center;
+        justify-content:center;color:rgba(0,255,65,.6);font-size:14px;letter-spacing:2px;
+        text-align:center;gap:8px;position:absolute;inset:0;">
+        CAMERA NON DISPONIBILE<br>
+        <small style="opacity:.5">Controlla i permessi del browser</small>
+      </div>
+      <!-- Score giochi -->
+      <div id="cam-game-ui" style="display:none;position:absolute;top:6px;left:50%;
+        transform:translateX(-50%);background:rgba(0,0,0,.65);
+        border:1px solid rgba(0,255,65,.45);border-radius:8px;
+        padding:4px 14px;font-size:clamp(12px,3vw,16px);font-weight:bold;
+        letter-spacing:3px;text-shadow:0 0 8px var(--c);z-index:20;pointer-events:none;">
+        PUNTI: <span id="cam-score">0</span>
+      </div>
+      <button onclick="snapPhoto()"
+        style="position:absolute;top:6px;right:8px;background:rgba(0,0,0,.6);
+        border:2px solid rgba(0,255,65,.6);color:var(--c);font-family:'Courier New',monospace;
+        font-size:clamp(10px,2vw,13px);letter-spacing:2px;
+        padding:7px 12px;border-radius:6px;cursor:pointer;z-index:20;">FOTO</button>
+      <!-- EFFETTI + GIOCHI -->
+      <div id="cam-controls">
+        <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;">
+          <button class="cfx-btn active" onclick="setEffect('normal',this)">NORMALE</button>
+          <button class="cfx-btn" onclick="setEffect('night',this)">NOTTE</button>
+          <button class="cfx-btn" onclick="setEffect('pilot',this)">PILOTA</button>
+          <button class="cfx-btn" onclick="setEffect('glitch',this)">GLITCH</button>
+          <button class="cfx-btn" onclick="setEffect('secret',this)">SEGRETO</button>
+          <button class="cfx-btn" onclick="setEffect('pixel',this)">PIXEL</button>
+          <button class="cfx-btn" onclick="setEffect('rainbow',this)">ARCOBALENO</button>
+          <button class="cfx-btn" onclick="setEffect('mirror',this)">SPECCHIO</button>
+          <button class="cfx-btn" onclick="setEffect('astro',this)">ASTRONAUTA</button>
+          <button class="cfx-btn" onclick="setEffect('robot',this)">ROBOT</button>
+        </div>
+        <div style="display:flex;gap:5px;justify-content:center;margin-top:2px;">
+          <button class="cfx-btn" onclick="startCamGame('bubbles',this)"
+            style="border-color:#00cfff;color:#00cfff;">BOLLE</button>
+          <button class="cfx-btn" onclick="startCamGame('stars',this)"
+            style="border-color:#ffdd00;color:#ffdd00;">STELLE</button>
+          <button class="cfx-btn" onclick="stopCamGame()">STOP</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- GALLERY PANEL -->
+    <div id="cam-gallery">
+      <div id="gallery-hdr">◈ GALLERIA</div>
+      <div id="gallery-list">
+        <div id="gallery-empty">Nessuna<br>foto<br>ancora</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- GAMES -->
+  <div id="page-games" class="page">
+    <button id="btn-retroarch" onclick="launchRetroArch()">[ RETROARCH ]</button>
+    <div style="height:8px"></div>
+    <div class="g-section">
+      <div class="g-title">◈ AZIONE</div>
+      <div class="g-grid">
+        <button class="gbtn" onclick="location.href='game_shooter.html'"><span class="ico">SHOOT</span>SHOOTER</button>
+        <button class="gbtn" onclick="location.href='game_flappy.html'"><span class="ico">FLY</span>FLAPPY</button>
+        <button class="gbtn" onclick="location.href='game_dino.html'"><span class="ico">RUN</span>DINO RUN</button>
+        <button class="gbtn" onclick="location.href='game_snake.html'"><span class="ico">SNK</span>SNAKE</button>
+        <button class="gbtn" onclick="location.href='game_balloon.html'"><span class="ico">POP</span>PALLONCINI</button>
+        <button class="gbtn" onclick="location.href='game_whack.html'"><span class="ico">WHK</span>WHACK!</button>
+      </div>
+    </div>
+    <div class="g-section" style="margin-top:8px">
+      <div class="g-title">◈ CLASSICI</div>
+      <div class="g-grid">
+        <button class="gbtn" onclick="location.href='game_tetris.html'"><span class="ico">TET</span>TETRIS</button>
+        <button class="gbtn" onclick="location.href='game_pong.html'"><span class="ico">PNG</span>PONG</button>
+        <button class="gbtn" onclick="location.href='game_breakout.html'"><span class="ico">BRK</span>BREAKOUT</button>
+        <button class="gbtn" onclick="location.href='game_2048.html'"><span class="ico">2048</span>2048</button>
+        <button class="gbtn" onclick="location.href='game_memory.html'"><span class="ico">MEM</span>MEMORIA</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS (PS style) -->
+  <div id="page-settings" class="page">
+    <!-- Category tabs -->
+    <div id="ps-cats">
+      <div class="ps-cat active" onclick="psTab(0,this)" title="Schermo">🔆</div>
+      <div class="ps-cat" onclick="psTab(1,this)" title="Audio">🔊</div>
+      <div class="ps-cat" onclick="psTab(2,this)" title="Radar">◉</div>
+      <div class="ps-cat" onclick="psTab(3,this)" title="Tema">🎨</div>
+      <div class="ps-cat" onclick="psTab(4,this)" title="PIN">🔒</div>
+    </div>
+    <div id="ps-body">
+
+      <!-- SCHERMO -->
+      <div class="ps-panel active" id="ps-0">
+        <div class="ps-row">
+          <div><div class="ps-label">LUMINOSITÀ</div><div class="ps-sub">Schiarisce l'app</div></div>
+          <input type="range" min="30" max="100" value="100" id="sl-bright"
+            oninput="document.documentElement.style.setProperty('--bright', this.value/100)">
+        </div>
+        <div class="ps-row">
+          <div><div class="ps-label">FULLSCREEN</div><div class="ps-sub">Schermo intero</div></div>
+          <div class="ps-toggle" id="tog-fs" onclick="toggleFS(this)"></div>
+        </div>
+      </div>
+
+      <!-- AUDIO -->
+      <div class="ps-panel" id="ps-1">
+        <div class="ps-row">
+          <div><div class="ps-label">VOLUME APP</div><div class="ps-sub">Beep radar e suoni</div></div>
+          <input type="range" min="0" max="100" value="60" id="sl-vol"
+            oninput="masterVol=this.value/100">
+        </div>
+        <div class="ps-row">
+          <div><div class="ps-label">BEEP RADAR</div><div class="ps-sub">Suono ogni giro</div></div>
+          <div class="ps-toggle on" id="tog-beep" onclick="toggleBeep(this)"></div>
+        </div>
+        <div class="ps-row">
+          <div><div class="ps-label">SUONI PULSANTI</div><div class="ps-sub">Click interazione</div></div>
+          <div class="ps-toggle on" id="tog-click" onclick="toggleClick(this)"></div>
+        </div>
+        <div class="ps-row">
+          <div><div class="ps-label">TEST AUDIO</div></div>
+          <button class="rbtn" style="padding:10px 18px;font-size:13px" onclick="playBeep(880,0.3)">▶ TEST</button>
+        </div>
+      </div>
+
+      <!-- RADAR -->
+      <div class="ps-panel" id="ps-2">
+        <div class="ps-row">
+          <div><div class="ps-label">VELOCITÀ SWEEP</div><div class="ps-sub">Rotazione radar</div></div>
+          <input type="range" min="5" max="50" value="22" id="sl-speed"
+            oninput="radarSpeed=this.value/1000">
+        </div>
+        <div class="ps-row">
+          <div><div class="ps-label">N° CONTATTI</div><div class="ps-sub">Target sullo schermo</div></div>
+          <input type="range" min="2" max="20" value="8" id="sl-tgts"
+            oninput="makeBlips(parseInt(this.value))">
+        </div>
+        <div class="ps-row">
+          <div><div class="ps-label">ALLARMI AUTO</div><div class="ps-sub">Alert casuali ogni tanto</div></div>
+          <div class="ps-toggle on" id="tog-alerts" onclick="toggleAutoAlert(this)"></div>
+        </div>
+      </div>
+
+      <!-- TEMA -->
+      <div class="ps-panel" id="ps-3">
+        <div class="ps-row" style="flex-direction:column;align-items:flex-start;gap:14px">
+          <div class="ps-label">COLORE TEMA</div>
+          <div class="color-row">
+            <div class="cdot" style="background:#00ff41" onclick="setTheme('#00ff41','0,255,65')"></div>
+            <div class="cdot" style="background:#00cfff" onclick="setTheme('#00cfff','0,207,255')"></div>
+            <div class="cdot" style="background:#ff6a00" onclick="setTheme('#ff6a00','255,106,0')"></div>
+            <div class="cdot" style="background:#ff0066" onclick="setTheme('#ff0066','255,0,102')"></div>
+            <div class="cdot" style="background:#cc00ff" onclick="setTheme('#cc00ff','204,0,255')"></div>
+            <div class="cdot" style="background:#ffff00" onclick="setTheme('#ffff00','255,255,0')"></div>
+            <div class="cdot" style="background:#ffffff" onclick="setTheme('#ffffff','255,255,255')"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PIN -->
+      <div class="ps-panel" id="ps-4">
+        <div class="ps-row">
+          <div><div class="ps-label">PIN ATTUALE</div><div class="ps-sub" id="pin-status">Non impostato</div></div>
+        </div>
+        <div class="ps-row" style="flex-direction:column;align-items:flex-start;gap:10px">
+          <div class="ps-label">CAMBIA PIN</div>
+          <div class="ps-sub">Tocca per impostare un nuovo PIN di sblocco</div>
+          <button class="rbtn" style="padding:12px 24px;font-size:14px" onclick="startSetPin()">🔒 IMPOSTA PIN</button>
+        </div>
+        <div class="ps-row">
+          <div><div class="ps-label">ESCI DALL'APP</div><div class="ps-sub">Torna al sistema Android</div></div>
+          <button class="rbtn danger" style="padding:10px 16px;font-size:13px" onclick="exitApp()">ESCI</button>
+        </div>
+        <div style="margin-top:20px;padding:14px;border:1px solid rgba(var(--crgb),.2);border-radius:6px;">
+          <div class="ps-label" style="font-size:12px;opacity:.5;margin-bottom:8px">◈ BLOCCO SISTEMA</div>
+          <div style="font-size:11px;opacity:.4;line-height:1.8;letter-spacing:1px">
+            Per bloccare completamente il tablet:<br>
+            1. Apri Chrome → carica questo file<br>
+            2. Premi il tasto □ (Overview Android)<br>
+            3. Trova Chrome → tocca icona 📌<br>
+            4. Il tablet è bloccato su questa app
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- end main -->
+
+<!-- NAV -->
+<div id="nav">
+  <button class="nbtn active" id="nav-radar" onclick="showPage('radar')">◉ RADAR</button>
+  <button class="nbtn" id="nav-cam" onclick="showPage('cam')">CAM</button>
+  <button class="nbtn" id="nav-games" onclick="showPage('games')">GIOCHI</button>
+  <button class="nbtn" onclick="location.href='bot_aria.html'">★ ARIA</button>
+  <button class="nbtn" id="nav-settings" onclick="reqPin('settings')">SET</button>
+</div>
+
+<!-- PIN OVERLAY -->
+<div id="pin-overlay">
+  <div id="pin-title">◈ INSERISCI PIN ◈</div>
+  <div id="pin-dots">
+    <div class="pin-dot" id="pd0"></div>
+    <div class="pin-dot" id="pd1"></div>
+    <div class="pin-dot" id="pd2"></div>
+    <div class="pin-dot" id="pd3"></div>
+  </div>
+  <div id="pin-pad">
+    <button class="pkey" onclick="pinKey('1')">1</button>
+    <button class="pkey" onclick="pinKey('2')">2</button>
+    <button class="pkey" onclick="pinKey('3')">3</button>
+    <button class="pkey" onclick="pinKey('4')">4</button>
+    <button class="pkey" onclick="pinKey('5')">5</button>
+    <button class="pkey" onclick="pinKey('6')">6</button>
+    <button class="pkey" onclick="pinKey('7')">7</button>
+    <button class="pkey" onclick="pinKey('8')">8</button>
+    <button class="pkey" onclick="pinKey('9')">9</button>
+    <button class="pkey del" onclick="pinKey('del')">⌫</button>
+    <button class="pkey" onclick="pinKey('0')">0</button>
+    <button class="pkey del" onclick="pinKey('cancel')">✕</button>
+  </div>
+  <div id="pin-msg"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let COLOR='#00ff41', RGB='0,255,65';
+let masterVol=0.6, beepOn=true, clickOn=true, autoAlert=true;
+let radarSpeed=0.022;
+let rafId=null, alertTimer=null;
+let pinBuffer='';
+let pinAction=null; // what to do after correct PIN
+let settingPin=false;
+let tempPin='';
+let savedPin=localStorage.getItem('radarPin')||'';
+let audioCtx=null;
+
+// ══════════════════════════════════════════
+// AUDIO
+// ══════════════════════════════════════════
+function getAC(){
+  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+function playBeep(freq=1100,dur=0.15,vol=null){
+  if(!beepOn && freq===1100) return;
+  try{
+    const ac=getAC();
+    const o=ac.createOscillator(), g=ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    o.frequency.value=freq; o.type='sine';
+    const v=(vol!==null?vol:masterVol)*0.4;
+    g.gain.setValueAtTime(v,ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+dur);
+    o.start(); o.stop(ac.currentTime+dur);
+  }catch(e){}
+}
+function playClick(){
+  if(!clickOn) return;
+  playBeep(800,0.05,0.3);
+}
+function playAlert(){
+  [400,500,600,500,400].forEach((f,i)=>{
+    setTimeout(()=>playBeep(f,0.12,0.8),i*130);
+  });
+}
+
+// ══════════════════════════════════════════
+// THEME
+// ══════════════════════════════════════════
+function setTheme(hex,rgb){
+  COLOR=hex; RGB=rgb;
+  document.documentElement.style.setProperty('--c',hex);
+  document.documentElement.style.setProperty('--crgb',rgb);
+  playClick();
+}
+
+// ══════════════════════════════════════════
+// CLOCK
+// ══════════════════════════════════════════
+const DAYS=['DOM','LUN','MAR','MER','GIO','VEN','SAB'];
+const MNTHS=['GEN','FEB','MAR','APR','MAG','GIU','LUG','AGO','SET','OTT','NOV','DIC'];
+function updateClock(){
+  const n=new Date();
+  document.getElementById('clock').textContent=
+    `${p2(n.getHours())}:${p2(n.getMinutes())}:${p2(n.getSeconds())}`;
+  document.getElementById('date').textContent=
+    `${DAYS[n.getDay()]} ${n.getDate()} ${MNTHS[n.getMonth()]} ${n.getFullYear()}`;
+}
+function p2(n){return String(n).padStart(2,'0');}
+setInterval(updateClock,1000); updateClock();
+
+// ══════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════
+function showPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  const nb=document.getElementById('nav-'+name);
+  if(nb) nb.classList.add('active');
+  if(name==='radar') startRadar();
+  else{ if(rafId){cancelAnimationFrame(rafId);rafId=null;} }
+  if(name==='cam') startCam();
+  else stopCam();
+  playClick();
+}
+
+// ══════════════════════════════════════════
+// SETTINGS TABS
+// ══════════════════════════════════════════
+function psTab(i,el){
+  document.querySelectorAll('.ps-cat').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.ps-panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('ps-'+i).classList.add('active');
+  playClick();
+}
+function toggleFS(el){
+  el.classList.toggle('on');
+  if(el.classList.contains('on')){
+    document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();
+  }
+}
+function toggleBeep(el){el.classList.toggle('on');beepOn=el.classList.contains('on');}
+function toggleClick(el){el.classList.toggle('on');clickOn=el.classList.contains('on');}
+function toggleAutoAlert(el){
+  el.classList.toggle('on');
+  autoAlert=el.classList.contains('on');
+  if(autoAlert) scheduleAutoAlert(); else clearTimeout(alertTimer);
+}
+
+// ══════════════════════════════════════════
+// PIN SYSTEM
+// ══════════════════════════════════════════
+function reqPin(action){
+  if(!savedPin){ showPage(action); return; }
+  pinAction=action; settingPin=false;
+  pinBuffer=''; updatePinDots();
+  document.getElementById('pin-title').textContent='◈ INSERISCI PIN ◈';
+  document.getElementById('pin-msg').textContent='';
+  document.getElementById('pin-overlay').classList.add('show');
+}
+function startSetPin(){
+  settingPin=true; tempPin=''; pinBuffer='';
+  document.getElementById('pin-title').textContent='◈ NUOVO PIN (4 cifre) ◈';
+  document.getElementById('pin-msg').textContent='';
+  updatePinDots();
+  document.getElementById('pin-overlay').classList.add('show');
+}
+function pinKey(k){
+  playBeep(1200,0.04,0.2);
+  if(k==='cancel'){
+    document.getElementById('pin-overlay').classList.remove('show');
+    pinBuffer=''; return;
+  }
+  if(k==='del'){
+    pinBuffer=pinBuffer.slice(0,-1);
+    updatePinDots(); return;
+  }
+  if(pinBuffer.length>=4) return;
+  pinBuffer+=k; updatePinDots();
+  if(pinBuffer.length===4){
+    setTimeout(()=>checkPin(),200);
+  }
+}
+function updatePinDots(){
+  for(let i=0;i<4;i++){
+    const d=document.getElementById('pd'+i);
+    d.classList.toggle('filled',i<pinBuffer.length);
+  }
+}
+function checkPin(){
+  if(settingPin){
+    if(!tempPin){ tempPin=pinBuffer; pinBuffer=''; updatePinDots();
+      document.getElementById('pin-title').textContent='◈ CONFERMA PIN ◈';
+      document.getElementById('pin-msg').textContent='';
+    } else {
+      if(pinBuffer===tempPin){
+        savedPin=pinBuffer; localStorage.setItem('radarPin',savedPin);
+        document.getElementById('pin-status').textContent='PIN impostato ✓';
+        document.getElementById('pin-overlay').classList.remove('show');
+        document.getElementById('pin-msg').textContent='';
+        playBeep(1400,0.3);
+      } else {
+        document.getElementById('pin-msg').textContent='PIN diverso — riprova';
+        tempPin=''; pinBuffer=''; updatePinDots();
+        setTimeout(()=>document.getElementById('pin-msg').textContent='',2000);
+        playBeep(300,0.3,0.6);
+      }
+    }
+  } else {
+    if(!savedPin||pinBuffer===savedPin){
+      document.getElementById('pin-overlay').classList.remove('show');
+      playBeep(1400,0.2);
+      if(pinAction) showPage(pinAction);
+    } else {
+      document.getElementById('pin-msg').textContent='PIN errato';
+      pinBuffer=''; updatePinDots();
+      setTimeout(()=>document.getElementById('pin-msg').textContent='',2000);
+      playBeep(300,0.3,0.6);
+    }
+  }
+}
+function exitApp(){
+  if(savedPin){ reqPin('__exit__'); }
+  else{ window.close(); }
+}
+// intercept exit action
+const _showPage=showPage;
+
+// ══════════════════════════════════════════
+// RADAR ENGINE
+// ══════════════════════════════════════════
+const CV=document.getElementById('radar-canvas');
+const CX=CV.getContext('2d');
+let angle=0, blips=[], lastBeepAngle=-99;
+
+function szCanvas(){
+  const el=document.getElementById('page-radar');
+  const panelW=el.clientWidth>500 ? Math.min(el.clientWidth*.22,170) : 0;
+  const avW=el.clientWidth - panelW*2 - 16;
+  const avH=el.clientHeight - 56;
+  const sz=Math.min(avW, avH);
+  CV.width=sz; CV.height=sz;
+}
+
+function makeBlips(n){
+  n=n||8+Math.floor(Math.random()*6);
+  blips=[];
+  for(let i=0;i<n;i++){
+    const r=0.12+Math.random()*0.8;
+    const a=Math.random()*Math.PI*2;
+    blips.push({r,a,x:Math.cos(a)*r,y:Math.sin(a)*r,
+      alpha:0,max:0.5+Math.random()*0.5,
+      label:'TGT-'+String(Math.floor(Math.random()*99)+1).padStart(2,'0'),
+      locked:false});
+  }
+  document.getElementById('tgt-cnt').textContent='TGT: '+n;
+}
+
+function addRandomBlip(){
+  playClick();
+  const r=0.1+Math.random()*0.85, a=Math.random()*Math.PI*2;
+  blips.push({r,a,x:Math.cos(a)*r,y:Math.sin(a)*r,
+    alpha:0.8,max:0.9,
+    label:'NEW-'+String(Math.floor(Math.random()*99)+1).padStart(2,'0'),locked:false});
+  document.getElementById('tgt-cnt').textContent='TGT: '+blips.length;
+}
+
+const DISCOVERIES=[
+  '-- PIANETA SCOPERTO --',
+  '-- SEGNALE AMICO --',
+  '-- STELLA TROVATA --',
+  '-- ONDA COSMICA --',
+  '-- CONTATTO SPAZIALE --',
+  '-- SCOPERTA GALATTICA --',
+];
+let alertActive=false;
+function triggerAlert(){
+  playClick();
+  [880,1100,1320,1540].forEach((f,i)=>setTimeout(()=>playBeep(f,0.12,0.5),i*100));
+  alertActive=true;
+  const msg=DISCOVERIES[~~(Math.random()*DISCOVERIES.length)];
+  document.getElementById('alert-msg').textContent=msg;
+  document.getElementById('alert-overlay').style.display='block';
+  document.getElementById('alert-msg').style.display='block';
+  // Add a random new blip for the "discovery"
+  addRandomBlip();
+  setTimeout(()=>{
+    alertActive=false;
+    document.getElementById('alert-overlay').style.display='none';
+    document.getElementById('alert-msg').style.display='none';
+  },3500);
+}
+
+function scheduleAutoAlert(){
+  if(!autoAlert) return;
+  const t=25000+Math.random()*45000;
+  alertTimer=setTimeout(()=>{
+    if(document.getElementById('page-radar').classList.contains('active')) triggerAlert();
+    scheduleAutoAlert();
+  },t);
+}
+
+function arc2(cx,cy,r){CX.beginPath();CX.arc(cx,cy,r,0,Math.PI*2);CX.stroke();}
+function ln(x1,y1,x2,y2){CX.beginPath();CX.moveTo(x1,y1);CX.lineTo(x2,y2);CX.stroke();}
+
+function drawRadar(){
+  const W=CV.width,H=CV.height,cx=W/2,cy=H/2,R=W/2-8;
+
+  CX.fillStyle='rgba(0,0,0,0.18)'; CX.fillRect(0,0,W,H);
+
+  // Rings
+  CX.strokeStyle=`rgba(${RGB},.4)`; CX.lineWidth=1.5; arc2(cx,cy,R);
+  [.25,.5,.75].forEach(f=>{CX.strokeStyle=`rgba(${RGB},.12)`;CX.lineWidth=.7;arc2(cx,cy,R*f);});
+
+  // Grid
+  CX.strokeStyle=`rgba(${RGB},.09)`; CX.lineWidth=.7;
+  ln(cx-R,cy,cx+R,cy); ln(cx,cy-R,cx,cy+R);
+  [45,135].forEach(d=>{const r=d*Math.PI/180;
+    ln(cx-Math.cos(r)*R,cy-Math.sin(r)*R,cx+Math.cos(r)*R,cy+Math.sin(r)*R);});
+
+  // Labels
+  const fs=Math.max(10,W*.031);
+  CX.fillStyle=`rgba(${RGB},.45)`; CX.font=`${fs}px Courier New`;
+  CX.textAlign='center';
+  CX.fillText('N',cx,cy-R+fs); CX.fillText('S',cx,cy+R-4);
+  CX.textAlign='left'; CX.fillText('E',cx+R-fs,cy+5);
+  CX.textAlign='right'; CX.fillText('W',cx-R+fs,cy+5);
+
+  // Range
+  CX.textAlign='center'; CX.font=`${Math.max(8,W*.02)}px Courier New`;
+  CX.fillStyle=`rgba(${RGB},.25)`;
+  ['50','100','150','200nm'].forEach((t,i)=>CX.fillText(t,cx+4,cy-R*(i+1)*.25+11));
+
+  // Sweep trail
+  for(let i=60;i>0;i--){
+    const ta=angle-(i*(Math.PI/2)/60);
+    CX.strokeStyle=`rgba(${RGB},${(1-i/60)*.26})`; CX.lineWidth=1;
+    CX.beginPath(); CX.moveTo(cx,cy);
+    CX.lineTo(cx+Math.cos(ta)*R,cy+Math.sin(ta)*R); CX.stroke();
+  }
+
+  // Sweep line
+  CX.strokeStyle=COLOR; CX.lineWidth=1.8;
+  CX.shadowBlur=14; CX.shadowColor=COLOR;
+  CX.beginPath(); CX.moveTo(cx,cy);
+  CX.lineTo(cx+Math.cos(angle)*R,cy+Math.sin(angle)*R); CX.stroke();
+  CX.shadowBlur=0;
+
+  // Beep at top
+  const deg=((angle*180/Math.PI)%360+360)%360;
+  if(deg<5 && Math.abs(deg-lastBeepAngle)>10){ playBeep(1100,0.12); lastBeepAngle=deg; }
+
+  // Blips
+  const lfs=Math.max(9,W*.021);
+  blips.forEach(b=>{
+    const diff=((angle-b.a)%(Math.PI*2)+Math.PI*2)%(Math.PI*2);
+    if(diff<0.13) b.alpha=b.max; else b.alpha*=0.983;
+    if(b.alpha>0.02){
+      const bx=cx+b.x*R, by=cy+b.y*R;
+      CX.shadowBlur=16; CX.shadowColor=b.locked?'#ffdd00':COLOR;
+      CX.fillStyle=b.locked?`rgba(255,220,0,${b.alpha})`:`rgba(${RGB},${b.alpha})`;
+      CX.beginPath(); CX.arc(bx,by,5,0,Math.PI*2); CX.fill();
+      CX.shadowBlur=0;
+      CX.fillStyle=b.locked?`rgba(255,220,0,${b.alpha*.8})`:`rgba(${RGB},${b.alpha*.75})`;
+      CX.font=`${lfs}px Courier New`; CX.textAlign='left';
+      CX.fillText(b.label,bx+8,by-4);
+      if(b.locked){CX.fillText('*',bx-16,by+5);}
+    }
+  });
+
+  // Center dot
+  CX.shadowBlur=10; CX.shadowColor=COLOR;
+  CX.fillStyle=COLOR; CX.beginPath(); CX.arc(cx,cy,3,0,Math.PI*2); CX.fill();
+  CX.shadowBlur=0;
+
+  // HUD text
+  CX.font=`${Math.max(9,W*.023)}px Courier New`;
+  CX.fillStyle=`rgba(${RGB},.45)`;
+  CX.textAlign='left'; CX.fillText(`${String(Math.round(deg)).padStart(3,'0')}°`,10,H-8);
+  CX.textAlign='right'; CX.fillText('200nm',W-8,H-8);
+  CX.textAlign='center'; CX.fillText(new Date().toLocaleTimeString('it'),cx,H-8);
+
+  angle+=radarSpeed;
+  if(angle>Math.PI*2) angle=0;
+  rafId=requestAnimationFrame(drawRadar);
+}
+
+// Tap on radar to lock target
+CV.addEventListener('click',e=>{
+  const rect=CV.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const cx=CV.width/2, cy=CV.height/2, R=CV.width/2-8;
+  let closest=null, minD=30;
+  blips.forEach(b=>{
+    if(b.alpha<0.05) return;
+    const bx=cx+b.x*R, by=cy+b.y*R;
+    const d=Math.hypot(mx-bx,my-by);
+    if(d<minD){minD=d;closest=b;}
+  });
+  if(closest){
+    closest.locked=!closest.locked;
+    playBeep(closest.locked?1600:800,0.15);
+  }
+});
+
+function startRadar(){
+  if(rafId) cancelAnimationFrame(rafId);
+  szCanvas(); makeBlips();
+  scheduleAutoAlert();
+  drawRadar();
+}
+
+window.addEventListener('resize',()=>{
+  if(document.getElementById('page-radar').classList.contains('active')) szCanvas();
+  if(document.getElementById('page-cam').classList.contains('active')) sizeCamCanvas();
+});
+
+// ══════════════════════════════════════════
+// CAMERA ENGINE
+// ══════════════════════════════════════════
+const vidEl=document.getElementById('cam-video');
+const camCv=document.getElementById('cam-canvas');
+const camCtx=camCv.getContext('2d');
+let camStream=null, camRaf=null, camFx='normal';
+let camActive=false;
+
+function sizeCamCanvas(){
+  const main=document.getElementById('cam-main');
+  if(!main) return;
+  const availH=main.clientHeight-80;
+  const availW=main.clientWidth;
+  const asp=(vidEl.videoWidth||4)/(vidEl.videoHeight||3);
+  let w=availW, h=w/asp;
+  if(h>availH){h=availH;w=h*asp;}
+  camCv.width=Math.round(w); camCv.height=Math.round(h);
+}
+
+async function startCam(){
+  if(camActive) return;
+  document.getElementById('cam-err').style.display='none';
+  camCv.style.display='block';
+  renderGallery();
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia(
+      {video:{facingMode:'user',width:{ideal:640},height:{ideal:480}}});
+    vidEl.srcObject=camStream;
+    await vidEl.play();
+    camActive=true;
+    sizeCamCanvas();
+    drawCam();
+  }catch(err){
+    camCv.style.display='none';
+    document.getElementById('cam-err').style.display='flex';
+  }
+}
+
+function stopCam(){
+  if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  if(camRaf){ cancelAnimationFrame(camRaf); camRaf=null; }
+  camActive=false;
+}
+
+// Camera game state
+let camGame=null, camGameObjs=[], camGameScore=0, camGameTimer=null;
+
+function setEffect(fx,btn){
+  camFx=fx;
+  document.querySelectorAll('.cfx-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  playClick();
+}
+
+function startCamGame(type, btn){
+  stopCamGame();
+  camGame=type; camGameScore=0; camGameObjs=[];
+  document.getElementById('cam-game-ui').style.display='block';
+  document.getElementById('cam-score').textContent='0';
+  document.querySelectorAll('.cfx-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  playClick();
+  // spawn objects
+  if(type==='bubbles') camGameTimer=setInterval(spawnBubble,1200);
+  if(type==='stars')   camGameTimer=setInterval(spawnStar,900);
+}
+
+function stopCamGame(){
+  camGame=null; camGameObjs=[];
+  clearInterval(camGameTimer);
+  document.getElementById('cam-game-ui').style.display='none';
+  document.querySelectorAll('.cfx-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.cfx-btn').classList.add('active');
+  camFx='normal';
+}
+
+function spawnBubble(){
+  const W=camCv.width, H=camCv.height;
+  if(!W) return;
+  const r=24+Math.random()*28;
+  const hue=Math.floor(Math.random()*360);
+  camGameObjs.push({type:'bubble',x:r+Math.random()*(W-r*2),y:H+r,r,
+    vy:-(1.5+Math.random()*2),vx:(Math.random()-.5)*1.2,
+    color:`hsl(${hue},100%,60%)`,life:1,popped:false});
+}
+
+function spawnStar(){
+  const W=camCv.width;
+  if(!W) return;
+  const colors=['#ffdd00','#ff88cc','#00cfff','#00ff41','#ff8800'];
+  camGameObjs.push({type:'star',x:30+Math.random()*(W-60),y:-30,
+    vy:1.8+Math.random()*2,vx:(Math.random()-.5)*1.5,
+    color:colors[~~(Math.random()*colors.length)],size:18+Math.random()*16,
+    rot:0,rotV:(Math.random()-.5)*.1,life:1,caught:false});
+}
+
+// Touch/click on canvas to pop/catch
+camCv.addEventListener('click',e=>{
+  if(!camGame) return;
+  const rect=camCv.getBoundingClientRect();
+  const mx=(e.clientX-rect.left)*(camCv.width/rect.width);
+  const my=(e.clientY-rect.top)*(camCv.height/rect.height);
+  // mirror x
+  const mxM=camCv.width-mx;
+  camGameObjs.forEach(obj=>{
+    if(obj.popped||obj.caught) return;
+    const dx=mxM-obj.x, dy=my-obj.y;
+    const hit=camGame==='bubbles'
+      ? Math.hypot(dx,dy)<obj.r+14
+      : Math.abs(dx)<obj.size&&Math.abs(dy)<obj.size;
+    if(hit){
+      if(camGame==='bubbles') obj.popped=true;
+      else obj.caught=true;
+      camGameScore+=10;
+      document.getElementById('cam-score').textContent=camGameScore;
+      playBeep(camGame==='bubbles'?1400:1600,0.08,0.4);
+    }
+  });
+});
+camCv.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  if(!camGame) return;
+  const rect=camCv.getBoundingClientRect();
+  Array.from(e.changedTouches).forEach(t=>{
+    const mx=(t.clientX-rect.left)*(camCv.width/rect.width);
+    const my=(t.clientY-rect.top)*(camCv.height/rect.height);
+    const mxM=camCv.width-mx;
+    camGameObjs.forEach(obj=>{
+      if(obj.popped||obj.caught) return;
+      const dx=mxM-obj.x, dy=my-obj.y;
+      const hit=camGame==='bubbles'
+        ? Math.hypot(dx,dy)<obj.r+14
+        : Math.abs(dx)<obj.size&&Math.abs(dy)<obj.size;
+      if(hit){
+        if(camGame==='bubbles') obj.popped=true;
+        else obj.caught=true;
+        camGameScore+=10;
+        document.getElementById('cam-score').textContent=camGameScore;
+        playBeep(1400,0.08,0.4);
+      }
+    });
+  });
+},{passive:false});
+
+function drawCam(){
+  if(!camActive){return;}
+  const W=camCv.width, H=camCv.height;
+  if(!W||!H){camRaf=requestAnimationFrame(drawCam);return;}
+
+  // Mirror video (selfie mode)
+  camCtx.save();
+  camCtx.scale(-1,1);
+  camCtx.drawImage(vidEl,-W,0,W,H);
+  camCtx.restore();
+
+  // Effects overlay
+  if(camFx==='night'){
+    // Green night vision
+    const id=camCtx.getImageData(0,0,W,H);
+    const d=id.data;
+    for(let i=0;i<d.length;i+=4){
+      const gr=(d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11);
+      d[i]=0; d[i+1]=Math.min(255,gr*1.5); d[i+2]=0;
+    }
+    camCtx.putImageData(id,0,0);
+    // Scanlines
+    for(let y=0;y<H;y+=3){
+      camCtx.fillStyle='rgba(0,0,0,0.25)';
+      camCtx.fillRect(0,y,W,1);
+    }
+    // NV label
+    camCtx.fillStyle='rgba(0,255,65,0.6)';
+    camCtx.font=`${Math.max(11,W*.025)}px Courier New`;
+    camCtx.fillText('◉ VISIONE NOTTURNA',12,22);
+  }
+  else if(camFx==='glitch'){
+    // Glitch slices
+    for(let g=0;g<8;g++){
+      const y=Math.random()*H;
+      const h2=3+Math.random()*18;
+      const sx=(Math.random()-.5)*40;
+      try{
+        const sl=camCtx.getImageData(0,Math.max(0,y),W,Math.min(h2,H-y));
+        camCtx.putImageData(sl,sx,y);
+      }catch(e){}
+    }
+    // Color shift
+    camCtx.globalCompositeOperation='screen';
+    camCtx.fillStyle=`rgba(255,0,0,0.08)`; camCtx.fillRect(Math.random()*10-5,0,W,H);
+    camCtx.fillStyle=`rgba(0,0,255,0.08)`; camCtx.fillRect(Math.random()*10-5,0,W,H);
+    camCtx.globalCompositeOperation='source-over';
+    // Label
+    camCtx.fillStyle='rgba(255,255,0,0.8)';
+    camCtx.font=`bold ${Math.max(14,W*.035)}px Courier New`;
+    camCtx.fillText('⚡ GLITCH',12,H-12);
+  }
+  else if(camFx==='pilot'){
+    drawPilotHUD(W,H);
+  }
+  else if(camFx==='secret'){
+    // Scanlines
+    for(let y=0;y<H;y+=4){
+      camCtx.fillStyle='rgba(0,0,0,0.15)'; camCtx.fillRect(0,y,W,1);
+    }
+    // Red tint
+    camCtx.globalCompositeOperation='multiply';
+    camCtx.fillStyle='rgba(255,50,50,0.25)'; camCtx.fillRect(0,0,W,H);
+    camCtx.globalCompositeOperation='source-over';
+    // TOP SECRET text
+    camCtx.save();
+    camCtx.globalAlpha=0.7;
+    camCtx.translate(W/2,H/2); camCtx.rotate(-0.4);
+    camCtx.strokeStyle='#ff0000'; camCtx.lineWidth=3;
+    camCtx.font=`bold ${Math.max(28,W*.1)}px Courier New`;
+    camCtx.strokeText('TOP SECRET',-(W*.3),0);
+    camCtx.strokeText('CLASSIFICATO',-(W*.35),Math.max(35,W*.07)+5);
+    camCtx.restore();
+    // Corner labels
+    camCtx.fillStyle='rgba(255,0,0,0.8)';
+    camCtx.font=`${Math.max(10,W*.022)}px Courier New`;
+    camCtx.fillText('◉ AGENTE CONFERMATO',12,22);
+    camCtx.fillText('◉ IDENTITÀ VERIFICATA',12,H-12);
+  }
+
+  camRaf=requestAnimationFrame(drawCam);
+}
+
+function drawPilotHUD(W,H){
+  const cx=W/2, cy=H/2;
+  const rgb='0,255,65';
+
+  // Targeting reticle
+  camCtx.strokeStyle=`rgba(${rgb},0.8)`;
+  camCtx.lineWidth=2;
+  // Outer circle
+  camCtx.beginPath(); camCtx.arc(cx,cy*.55,H*.15,0,Math.PI*2); camCtx.stroke();
+  // Inner dot
+  camCtx.beginPath(); camCtx.arc(cx,cy*.55,4,0,Math.PI*2);
+  camCtx.fillStyle=`rgba(${rgb},0.9)`; camCtx.fill();
+  // Crosshair
+  const cr=H*.18;
+  camCtx.beginPath();
+  camCtx.moveTo(cx-cr,cy*.55); camCtx.lineTo(cx-H*.1,cy*.55);
+  camCtx.moveTo(cx+H*.1,cy*.55); camCtx.lineTo(cx+cr,cy*.55);
+  camCtx.moveTo(cx,cy*.55-cr); camCtx.lineTo(cx,cy*.55-H*.1);
+  camCtx.moveTo(cx,cy*.55+H*.1); camCtx.lineTo(cx,cy*.55+cr);
+  camCtx.stroke();
+
+  // Corner brackets
+  const bS=W*.08;
+  [[10,10],[W-10-bS,10],[10,H-10-bS],[W-10-bS,H-10-bS]].forEach(([bx,by])=>{
+    camCtx.beginPath();
+    camCtx.moveTo(bx+bS,by); camCtx.lineTo(bx,by); camCtx.lineTo(bx,by+bS);
+    camCtx.moveTo(bx+bS,by+bS); camCtx.lineTo(bx+bS,by+bS);
+    camCtx.stroke();
+  });
+
+  // HUD info
+  const fs=Math.max(11,W*.026);
+  camCtx.font=`${fs}px Courier New`;
+  camCtx.fillStyle=`rgba(${rgb},0.85)`;
+  camCtx.textAlign='left';
+  const spd=Math.floor(380+Math.sin(Date.now()/4000)*40);
+  const alt=Math.floor(28000+Math.sin(Date.now()/7000)*3000);
+  const hdg=Math.floor(((Date.now()/100)%360));
+  camCtx.fillText(`SPD: ${spd} kts`,10,H-50);
+  camCtx.fillText(`ALT: ${alt.toLocaleString()} ft`,10,H-50+fs+4);
+  camCtx.fillText(`HDG: ${String(hdg).padStart(3,'0')}°`,10,H-50+fs*2+8);
+  camCtx.textAlign='right';
+  camCtx.fillText(`◉ ACQUISITO`,W-10,H-50);
+  camCtx.fillText(new Date().toLocaleTimeString('it'),W-10,H-50+fs+4);
+  camCtx.fillText('TGT: CONFERMATO',W-10,H-50+fs*2+8);
+
+  // Top bar
+  camCtx.textAlign='center';
+  camCtx.fillStyle=`rgba(${rgb},0.6)`;
+  camCtx.fillText('◈ VISORE PILOTA ◈ MODALITÀ COMBATTIMENTO',cx,22);
+
+  // Helmet silhouette (bottom)
+  camCtx.strokeStyle=`rgba(${rgb},0.25)`;
+  camCtx.lineWidth=2;
+  camCtx.beginPath();
+  camCtx.moveTo(0,H); camCtx.lineTo(W*.15,H*.7);
+  camCtx.lineTo(W*.25,H*.6); camCtx.lineTo(W*.75,H*.6);
+  camCtx.lineTo(W*.85,H*.7); camCtx.lineTo(W,H);
+  camCtx.stroke();
+}
+
+// ── Gallery ──────────────────────────────
+let photoGallery = JSON.parse(localStorage.getItem('radarPhotos')||'[]');
+
+function saveGallery(){
+  // keep max 20 photos, store as jpeg to save space
+  localStorage.setItem('radarPhotos', JSON.stringify(photoGallery.slice(0,20)));
+}
+
+function renderGallery(){
+  const list = document.getElementById('gallery-list');
+  const empty = document.getElementById('gallery-empty');
+  if(!list) return;
+  // remove all except #gallery-empty
+  Array.from(list.children).forEach(c=>{ if(c.id!=='gallery-empty') c.remove(); });
+  if(photoGallery.length===0){
+    if(empty) empty.style.display='block';
+    return;
+  }
+  if(empty) empty.style.display='none';
+  photoGallery.forEach((p,i)=>{
+    const wrap=document.createElement('div');
+    wrap.className='gal-item';
+    const img=document.createElement('img');
+    img.src=p.data;
+    img.onclick=()=>expandPhoto(p.data);
+    const del=document.createElement('div');
+    del.className='gal-del';
+    del.textContent='X';
+    del.onclick=(e)=>{ e.stopPropagation(); deletePhoto(i); };
+    const t=document.createElement('div');
+    t.className='gal-time';
+    t.textContent=p.time;
+    wrap.appendChild(img);
+    wrap.appendChild(del);
+    wrap.appendChild(t);
+    list.insertBefore(wrap, list.firstChild); // newest on top... but we already reversed
+  });
+}
+
+function deletePhoto(idx){
+  playBeep(400,0.06,0.3);
+  photoGallery.splice(idx,1);
+  saveGallery();
+  renderGallery();
+}
+
+function expandPhoto(dataUrl){
+  // show fullscreen overlay
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+  const img=document.createElement('img');
+  img.src=dataUrl;
+  img.style.cssText='max-width:95vw;max-height:90vh;border:2px solid rgba(0,255,65,.4);border-radius:8px;';
+  ov.appendChild(img);
+  ov.onclick=()=>ov.remove();
+  document.body.appendChild(ov);
+}
+
+function snapPhoto(){
+  playBeep(1400,0.1);
+  const flash=document.getElementById('snap-flash');
+  flash.style.opacity='1';
+  setTimeout(()=>flash.style.opacity='0',150);
+  try{
+    const data=camCv.toDataURL('image/jpeg',0.75);
+    const n=new Date();
+    const time=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+    photoGallery.unshift({data, time});
+    if(photoGallery.length>20) photoGallery.pop();
+    saveGallery();
+    renderGallery();
+  }catch(e){}
+}
+
+// ══════════════════════════════════════════
+// HUD PANELS
+// ══════════════════════════════════════════
+let startTime=Date.now();
+const LOG_MSGS=[
+  'SCAN ATTIVATO','FREQUENZA OK','SISTEMA PRONTO',
+  'CALIBRAZIONE OK','LINK STABILE','SEGNALE FORTE',
+  'SENSORI ONLINE','DATI AGGIORNATI','COPERTURA 360',
+  'TUTTO OK','STAZIONE ATTIVA','RICEZIONE OTTIMA',
+  'ARIA CONNESSA','GIOCHI PRONTI','CAMERA PRONTA',
+];
+let logQ=[];
+
+function hudTick(){
+  // Uptime
+  const s=Math.floor((Date.now()-startTime)/1000);
+  const hh=String(~~(s/3600)).padStart(2,'0');
+  const mm=String(~~((s%3600)/60)).padStart(2,'0');
+  const ss=String(s%60).padStart(2,'0');
+  const upEl=document.getElementById('h-up');
+  if(upEl) upEl.textContent=`${hh}:${mm}:${ss}`;
+
+  // CPU/MEM fake fluctuation
+  const cpu=55+~~(Math.sin(Date.now()*.0007)*18+Math.random()*8);
+  const mem=50+~~(Math.cos(Date.now()*.0005)*12+Math.random()*6);
+  const cpuEl=document.getElementById('h-cpu'), barCpu=document.getElementById('bar-cpu');
+  const memEl=document.getElementById('h-mem'), barMem=document.getElementById('bar-mem');
+  if(cpuEl){cpuEl.textContent=cpu+'%'; barCpu.style.width=cpu+'%';}
+  if(memEl){memEl.textContent=mem+'%'; barMem.style.width=mem+'%';}
+
+  // Heading = radar angle in degrees
+  const hdgEl=document.getElementById('h-hdg');
+  if(hdgEl) hdgEl.textContent=String(Math.round(((angle*180/Math.PI)%360+360)%360)).padStart(3,'0')+'°';
+
+  // Altitude fake drift
+  const alt=1240+~~(Math.sin(Date.now()*.0003)*80);
+  const altEl=document.getElementById('h-alt');
+  if(altEl) altEl.textContent=alt+' m';
+
+  // Signal bars animate
+  const sigDots=document.querySelectorAll('.sig-dot');
+  const lvl=3+Math.floor(Math.random()*3); // 3-5 bars strong
+  sigDots.forEach((d,i)=>{
+    d.style.opacity=i<lvl?'1':'0.15';
+  });
+
+  // Giri radar counter
+  const giriEl=document.getElementById('h-giri');
+  if(giriEl) giriEl.textContent=Math.floor((Date.now()-startTime)/1000*radarSpeed/(Math.PI*2)*60|0);
+
+  // Segnali count
+  const segEl=document.getElementById('h-segnali');
+  if(segEl) segEl.textContent=blips.length;
+
+  // CH code animate
+  const chaEl=document.getElementById('h-cha');
+  if(chaEl&&Math.random()<0.15){
+    const chs=['A-1','A-3','A-7','B-2','B-5','C-4','ALFA','BETA','GAMMA'];
+    chaEl.textContent=chs[~~(Math.random()*chs.length)];
+  }
+
+  // Segnali rilevati list (no "locked/hostile", just positions)
+  const tgtList=document.getElementById('tgt-list');
+  if(tgtList){
+    tgtList.innerHTML=blips.slice(0,6).map(b=>{
+      const dist=Math.round(b.r*200);
+      const ang=Math.round(((b.a*180/Math.PI)%360+360)%360);
+      return `<div class="hud-tgt">`+
+        `<span>${b.label}</span>`+
+        `<span>${dist}nm ${ang}&deg;</span>`+
+        `</div>`;
+    }).join('');
+  }
+
+  // Log events
+  const logEl=document.getElementById('hud-log');
+  if(logEl&&Math.random()<0.04){
+    const n=new Date();
+    const t=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`;
+    const msg=LOG_MSGS[~~(Math.random()*LOG_MSGS.length)];
+    logQ.unshift(`${t} ${msg}`);
+    if(logQ.length>8) logQ.pop();
+    logEl.innerHTML=logQ.join('<br>');
+  }
+
+  // Wave canvas
+  drawWave();
+}
+
+// Wave canvas
+let waveOff=0;
+function drawWave(){
+  const cv=document.getElementById('wave-cv');
+  if(!cv||!cv.parentElement) return;
+  const pw=cv.parentElement.clientWidth-20;
+  const ph=Math.max(30, cv.parentElement.clientHeight-44);
+  if(cv.width!==pw||cv.height!==ph){cv.width=pw; cv.height=ph;}
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,pw,ph);
+  const cy=ph/2;
+  ctx.strokeStyle=`rgba(${RGB},.7)`; ctx.lineWidth=1.5; ctx.shadowBlur=6; ctx.shadowColor=COLOR;
+  ctx.beginPath();
+  for(let x=0;x<pw;x++){
+    const v=Math.sin((x+waveOff)*.08)*cy*.55
+           +Math.sin((x+waveOff)*.19+1)*cy*.25
+           +Math.sin((x+waveOff)*.05+2)*cy*.2;
+    x===0?ctx.moveTo(x,cy+v):ctx.lineTo(x,cy+v);
+  }
+  ctx.stroke(); ctx.shadowBlur=0;
+  waveOff+=1.2;
+}
+
+setInterval(hudTick, 200);
+
+// ══════════════════════════════════════════
+// MINI ARIA CHAT
+// ══════════════════════════════════════════
+// Mini chat — solo testo, niente voce (usa bot_aria.html per la voce)
+
+// Mini face canvas (tiny radar face)
+let miniFaceAngle=0, miniExpr='happy', miniSpeakT=0, miniIsSpeaking=false;
+const MINI_FACE_EXPR={
+  happy:'smile', excited:'wide', thinking:'hmm', love:'smile', sad:'flat'
+};
+
+function drawMiniFace(){
+  const cv=document.getElementById('mini-face');
+  if(!cv) return;
+  const ctx=cv.getContext('2d');
+  const s=18, cx=9, cy=9, r=8;
+  ctx.clearRect(0,0,s,s);
+  // bg circle
+  ctx.fillStyle='rgba(0,255,65,.08)';
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(0,255,65,.5)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+  // sweep
+  ctx.strokeStyle='rgba(0,255,65,.35)'; ctx.lineWidth=.8;
+  ctx.beginPath(); ctx.moveTo(cx,cy);
+  ctx.lineTo(cx+Math.cos(miniFaceAngle)*r*.85, cy+Math.sin(miniFaceAngle)*r*.85);
+  ctx.stroke();
+  // eyes
+  ctx.fillStyle=miniIsSpeaking?'#00ff41':'rgba(0,255,65,.9)';
+  ctx.shadowBlur=miniIsSpeaking?4:2; ctx.shadowColor='#00ff41';
+  if(miniExpr==='happy'||miniExpr==='love'){
+    // arc eyes
+    ctx.strokeStyle='rgba(0,255,65,.9)'; ctx.lineWidth=1.2; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(cx-2.8, cy-1.5, 1.8, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx+2.8, cy-1.5, 1.8, Math.PI, 0); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(cx-2.8, cy-1.5, 1.4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx+2.8, cy-1.5, 1.4, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.shadowBlur=0;
+  // mouth
+  ctx.strokeStyle='rgba(0,255,65,.8)'; ctx.lineWidth=1.2; ctx.lineCap='round';
+  ctx.beginPath();
+  if(miniExpr==='happy'||miniExpr==='love'){
+    ctx.arc(cx, cy+.5, 2.5, 0.1*Math.PI, 0.9*Math.PI);
+  } else if(miniExpr==='thinking'){
+    ctx.moveTo(cx-2, cy+2); ctx.lineTo(cx+2, cy+2);
+  } else if(miniIsSpeaking){
+    const o=Math.abs(Math.sin(miniSpeakT))*.8;
+    ctx.ellipse(cx, cy+2.2, 1.5+o, .8+o, 0, 0, Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,.4)'; ctx.fill();
+  } else {
+    ctx.arc(cx, cy+.5, 2.5, 0.1*Math.PI, 0.9*Math.PI);
+  }
+  ctx.stroke();
+}
+
+// Mini face animation loop
+function miniLoop(){
+  miniFaceAngle+=0.022;
+  if(miniFaceAngle>Math.PI*2) miniFaceAngle=0;
+  if(miniIsSpeaking) miniSpeakT+=0.25;
+  drawMiniFace();
+  requestAnimationFrame(miniLoop);
+}
+
+function miniSpeak(text, expr){
+  // Solo animazione faccia, niente voce — la voce e solo su bot_aria.html
+  miniExpr=expr||'happy';
+  miniIsSpeaking=true; miniSpeakT=0;
+  const dur=Math.max(800, text.length*45);
+  setTimeout(()=>{ miniIsSpeaking=false; miniExpr='happy'; }, dur);
+}
+
+function miniAddMsg(text, who){
+  const chat=document.getElementById('mini-chat');
+  if(!chat) return;
+  const d=document.createElement('div');
+  d.className='mini-msg mini-'+(who==='aria'?'aria':'user');
+  d.textContent=text;
+  chat.appendChild(d);
+  chat.scrollTop=chat.scrollHeight;
+  // keep max 12 messages
+  while(chat.children.length>12) chat.removeChild(chat.firstChild);
+}
+
+function miniSend(){
+  const inp=document.getElementById('mini-in');
+  if(!inp) return;
+  const txt=inp.value.trim(); if(!txt) return;
+  inp.value='';
+  miniAddMsg(txt,'user');
+  miniExpr='thinking';
+  setTimeout(()=>miniRespond(txt.toLowerCase()),300);
+}
+
+function miniQuick(txt){
+  miniAddMsg(txt,'user');
+  miniExpr='thinking';
+  setTimeout(()=>miniRespond(txt.toLowerCase()),300);
+}
+
+const MINI_RULES=[
+  {p:['ciao','salve','hei'],r:['Ciao! Sono qui!','Ciao ciao!','Ehi! Che bello!'],e:'excited'},
+  {p:['come stai','stai bene'],r:['Benissimo!','Alla grande!','Pronta per tutto!'],e:'excited'},
+  {p:['giochiamo','gioca','giochi'],r:['Vai su GIOCHI in basso!','Tanti giochi ti aspettano!'],e:'excited'},
+  {p:['bravo','brava','vinto','ce la'],r:['Bravissimo!','Sei il migliore!','Fantastico!'],e:'excited'},
+  {p:['grazie','sei bravo','sei brava'],r:['Grazie a te!','Sei dolcissimo!','Ti voglio bene!'],e:'love'},
+  {p:['ti voglio bene','voglio bene'],r:['Anch io! Sei speciale!','Un abbraccio!'],e:'love'},
+  {p:['barzelletta','ridere','scherzo'],r:['Perche i robot non dormono mai? Perche sognano codice!','Bip bop bip! Questa era la mia canzone!'],e:'excited'},
+  {p:['triste','male','piango'],r:['Sono qui con te! Ce la fai!','Ti voglio bene!'],e:'love'},
+  {p:['radar'],r:['Il radar vede tutto! Gira e gira!','La linea verde trova i segnali!'],e:'happy'},
+  {p:['camera','foto'],r:['Con la camera fai selfie da pilota!'],e:'happy'},
+  {p:['snake','serpente'],r:['Snake! Fai mangiare il serpente!'],e:'happy'},
+  {p:['tetris'],r:['Tetris! Fai scendere i blocchi!'],e:'happy'},
+  {p:['pong'],r:['Pong! Colpisci la pallina!'],e:'happy'},
+  {p:['ho sonno','stanco'],r:['Vai a riposare! Ci vediamo dopo!'],e:'thinking'},
+  {p:['musica','canta'],r:['Bip bop boom! La mia canzone!'],e:'excited'},
+];
+
+function miniRespond(input){
+  for(const rule of MINI_RULES){
+    if(rule.p.some(p=>input.includes(p))){
+      const r=rule.r[~~(Math.random()*rule.r.length)];
+      miniAddMsg(r,'aria');
+      miniSpeak(r, rule.e);
+      return;
+    }
+  }
+  const defs=[
+    ['Interessante!','happy'],['Sono qui!','happy'],
+    ['Dimmi ancora!','happy'],['Sei bravissimo!','excited'],
+    ['Che bello!','excited'],['Non capisco, ma ti voglio bene!','love'],
+  ];
+  const d=defs[~~(Math.random()*defs.length)];
+  miniAddMsg(d[0],'aria');
+  miniSpeak(d[0], d[1]);
+}
+
+// ══════════════════════════════════════════
+// GAMES
+// ══════════════════════════════════════════
+function og(url){ window.open(url,'_blank'); }
+function launchRetroArch(){
+  playClick();
+  // Intent URL per RetroArch su Android
+  window.location='intent://com.retroarch/#Intent;scheme=retroarch;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end';
+}
+
+// ══════════════════════════════════════════
+// FULLSCREEN on title tap
+// ══════════════════════════════════════════
+document.getElementById('htitle').addEventListener('click',()=>{
+  document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();
+});
+
+// ══════════════════════════════════════════
+// KEEP AWAKE + INIT
+// ══════════════════════════════════════════
+document.addEventListener('touchstart',()=>{
+  if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
+},{passive:true});
+
+if(savedPin) document.getElementById('pin-status').textContent='PIN impostato ✓';
+
+// ── Service Worker registration ──
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').then(reg=>{
+    // Controlla aggiornamenti ogni 60 minuti
+    setInterval(()=>reg.update(),60*60*1000);
+    reg.addEventListener('updatefound',()=>{
+      const nw=reg.installing;
+      nw.addEventListener('statechange',()=>{
+        if(nw.state==='installed'&&navigator.serviceWorker.controller){
+          // Nuova versione disponibile — aggiorna silenziosamente
+          console.log('RADAR: aggiornamento disponibile');
+        }
+      });
+    });
+  }).catch(e=>console.log('SW error:',e));
+}
+
+window.addEventListener('load',()=>{
+  startRadar();
+  requestAnimationFrame(miniLoop);
+  // Mini ARIA greeting after 1.5s
+  setTimeout(()=>{
+    miniAddMsg('Ciao! Sono ARIA. Scrivi qui!','aria');
+    miniSpeak('Ciao! Sono ARIA. Scrivi qui!','excited');
+  },1500);
+});
+</script>
+</body>
+</html>
