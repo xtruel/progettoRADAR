@@ -1,0 +1,24 @@
+{
+  "name": "RADAR CTRL",
+  "short_name": "RADAR",
+  "description": "Pannello di controllo radar con giochi e ARIA",
+  "start_url": "/radar_control.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#00ff41",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
