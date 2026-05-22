@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>DINO RUN</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{background:#000;color:#00ff41;font-family:'Courier New',monospace;
+  height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none;}
+#hdr{display:flex;justify-content:space-between;align-items:center;
+  padding:8px 14px;border-bottom:1px solid rgba(0,255,65,.25);flex-shrink:0;}
+.hbtn{background:none;border:1px solid rgba(0,255,65,.4);color:#00ff41;
+  font-family:'Courier New',monospace;font-size:12px;letter-spacing:2px;
+  padding:8px 14px;border-radius:4px;cursor:pointer;}
+.hbtn:active{background:rgba(0,255,65,.2);}
+#sval{font-size:clamp(20px,5vw,34px);font-weight:bold;text-shadow:0 0 10px #00ff41;}
+#main{flex:1;position:relative;overflow:hidden;}
+canvas{display:block;width:100%;height:100%;}
+#ov{position:absolute;inset:0;background:rgba(0,0,0,.9);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;}
+.ov-t{font-size:clamp(22px,6vw,42px);font-weight:bold;letter-spacing:4px;text-shadow:0 0 18px #00ff41;}
+.ov-s{font-size:clamp(12px,2.5vw,16px);opacity:.6;letter-spacing:2px;text-align:center;line-height:1.8;}
+.big-btn{background:rgba(0,255,65,.1);border:3px solid #00ff41;color:#00ff41;
+  font-family:'Courier New',monospace;font-size:clamp(16px,4vw,24px);font-weight:bold;
+  letter-spacing:4px;padding:16px 44px;border-radius:8px;cursor:pointer;
+  text-shadow:0 0 10px #00ff41;box-shadow:0 0 18px rgba(0,255,65,.3);}
+.big-btn:active{background:rgba(0,255,65,.3);transform:scale(.96);}
+#jump-btn{position:absolute;bottom:0;left:0;right:0;height:50%;
+  background:transparent;cursor:pointer;z-index:5;}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <button class="hbtn" onclick="location.href='radar_control.html'">RADAR</button>
+  <div style="text-align:center">
+    <div style="font-size:10px;opacity:.45;letter-spacing:3px">PUNTEGGIO</div>
+    <div id="sval">0</div>
+  </div>
+  <div style="text-align:right;font-size:11px;opacity:.45">
+    REC <span id="hi">0</span>
+  </div>
+</div>
+<div id="main">
+  <canvas id="cv"></canvas>
+  <div id="jump-btn" onclick="jump()" ontouchstart="jump()"></div>
+  <div id="ov">
+    <div class="ov-t">-- DINO RUN --</div>
+    <div class="ov-s">Tocca o premi SPAZIO<br>per saltare!</div>
+    <button class="big-btn" onclick="startGame()">GIOCA</button>
+  </div>
+</div>
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+let W,H,dino,obstacles,score,speed,run=false,raf,last=0,frame=0;
+let hi=+localStorage.getItem('dino_hi')||0;
+let groundY,stars=[];
+document.getElementById('hi').textContent=hi;
+
+function resize(){
+  const m=document.getElementById('main');
+  W=cv.width=m.clientWidth; H=cv.height=m.clientHeight;
+  groundY=H*.72;
+  stars=Array.from({length:40},()=>({x:Math.random()*W,y:Math.random()*groundY*.8,s:Math.random()*1.5+.5}));
+}
+
+function startGame(){
+  document.getElementById('ov').style.display='none';
+  resize();
+  dino={x:W*.12,y:groundY,w:28,h:36,vy:0,jumping:false,legT:0,dead:false};
+  obstacles=[]; score=0; speed=3.5; run=true; frame=0;
+  document.getElementById('sval').textContent=0;
+  cancelAnimationFrame(raf); last=performance.now();
+  raf=requestAnimationFrame(loop);
+}
+
+function jump(){
+  if(!run) return;
+  if(!dino.jumping){dino.vy=-H*.022; dino.jumping=true;}
+  else if(dino.vy>0) {} // double jump removed for simplicity
+}
+
+let obTimer=0;
+function loop(ts){
+  if(!run) return;
+  const dt=Math.min((ts-last)/16,3); last=ts; frame+=dt;
+  update(dt); draw();
+  raf=requestAnimationFrame(loop);
+}
+
+function update(dt){
+  // gravity
+  dino.vy+=H*.001*dt;
+  dino.y+=dino.vy*dt;
+  if(dino.y>=groundY){dino.y=groundY;dino.vy=0;dino.jumping=false;}
+  dino.legT+=dt;
+
+  // scroll stars
+  stars.forEach(s=>{s.x-=speed*.3*dt;if(s.x<0)s.x=W;});
+
+  // obstacles
+  obTimer-=dt;
+  if(obTimer<=0){
+    const h=20+Math.random()*30;
+    const w=12+Math.random()*16;
+    obstacles.push({x:W+w,y:groundY,w,h,type:Math.random()<0.3?'fly':'ground',
+      fy:groundY-h-(Math.random()<0.3?60+Math.random()*40:0)});
+    obTimer=55+Math.random()*50;
+  }
+  obstacles.forEach(o=>{
+    o.x-=speed*dt;
+    if(o.type==='fly') o.y+=(Math.sin(frame*.08)*.5)*dt;
+  });
+  obstacles=obstacles.filter(o=>o.x>-80);
+
+  // score + speed
+  score+=dt*.15;
+  document.getElementById('sval').textContent=Math.floor(score);
+  speed=3.5+Math.floor(score/100)*.4;
+
+  // collision
+  for(const o of obstacles){
+    const oy=o.type==='fly'?o.fy:o.y-o.h;
+    if(dino.x+dino.w-6>o.x+4&&dino.x+6<o.x+o.w-4&&
+       dino.y-dino.h+4<oy+o.h-4&&dino.y>oy+4){
+      endGame(); return;
+    }
+  }
+}
+
+function draw(){
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+
+  // stars
+  ctx.fillStyle='rgba(0,255,65,.3)';
+  stars.forEach(s=>ctx.fillRect(s.x,s.y,s.s,s.s));
+
+  // ground line
+  ctx.strokeStyle='rgba(0,255,65,.4)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,groundY+2); ctx.lineTo(W,groundY+2); ctx.stroke();
+  // ground dots
+  ctx.fillStyle='rgba(0,255,65,.12)';
+  for(let x=(frame*speed*.5)%30;x<W;x+=30) ctx.fillRect(x,groundY+3,12,2);
+
+  // DINO
+  const dx=dino.x, dy=dino.y-dino.h;
+  ctx.shadowBlur=12; ctx.shadowColor='#00ff41'; ctx.fillStyle='#00ff41';
+  // body
+  ctx.fillRect(dx,dy+4,dino.w,dino.h-4);
+  // head
+  ctx.fillRect(dx+dino.w-10,dy-12,18,16);
+  // eye
+  ctx.fillStyle='#000'; ctx.fillRect(dx+dino.w+4,dy-8,4,4);
+  // mouth
+  ctx.fillStyle='#00ff41';
+  // legs
+  const lp=Math.sin(dino.legT*.4)*6;
+  if(!dino.jumping){
+    ctx.fillStyle='#00ff41';
+    ctx.fillRect(dx+4,dy+dino.h-4,8,lp>0?8:3);
+    ctx.fillRect(dx+dino.w-10,dy+dino.h-4,8,lp>0?3:8);
+  }
+  ctx.shadowBlur=0;
+
+  // obstacles
+  obstacles.forEach(o=>{
+    const oy=o.type==='fly'?o.fy:o.y-o.h;
+    ctx.shadowBlur=8; ctx.shadowColor='#ff6600'; ctx.fillStyle='#ff6600';
+    if(o.type==='fly'){
+      // flying rock with wings
+      ctx.fillRect(o.x,oy,o.w,o.h);
+      ctx.fillStyle='rgba(255,100,0,.5)';
+      ctx.fillRect(o.x-8,oy+4,8,o.h*.4);
+      ctx.fillRect(o.x+o.w,oy+4,8,o.h*.4);
+    } else {
+      // cactus style
+      ctx.fillRect(o.x+o.w*.3,oy,o.w*.4,o.h);
+      ctx.fillRect(o.x,oy+o.h*.25,o.w,o.h*.25);
+    }
+    ctx.shadowBlur=0;
+  });
+
+  // HUD speed
+  ctx.fillStyle='rgba(0,255,65,.3)'; ctx.font='10px Courier New';
+  ctx.textAlign='right'; ctx.fillText('SPD:'+speed.toFixed(1),W-8,H-8);
+}
+
+function endGame(){
+  run=false;
+  const s=Math.floor(score);
+  if(s>hi){hi=s;localStorage.setItem('dino_hi',hi);document.getElementById('hi').textContent=hi;}
+  document.querySelector('.ov-t').textContent='-- FINE --';
+  document.querySelector('.ov-s').textContent='PUNTEGGIO: '+s+'   RECORD: '+hi;
+  document.querySelector('.big-btn').textContent='RIGIOCA';
+  document.getElementById('ov').style.display='flex';
+}
+
+document.addEventListener('keydown',e=>{if(e.code==='Space'||e.key==='ArrowUp'){e.preventDefault();jump();}});
+window.addEventListener('resize',()=>{if(run)resize();});
+</script>
+</body>
+</html>
