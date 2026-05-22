@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>2048</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{background:#000;color:#00ff41;font-family:'Courier New',monospace;
+  height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none;}
+#hdr{display:flex;justify-content:space-between;align-items:center;
+  padding:8px 14px;border-bottom:1px solid rgba(0,255,65,.25);flex-shrink:0;}
+.hbtn{background:none;border:1px solid rgba(0,255,65,.4);color:#00ff41;
+  font-family:'Courier New',monospace;font-size:12px;letter-spacing:2px;
+  padding:8px 14px;border-radius:4px;cursor:pointer;}
+.hbtn:active{background:rgba(0,255,65,.2);}
+#sval{font-size:clamp(20px,5vw,34px);font-weight:bold;text-shadow:0 0 10px #00ff41;}
+#main{flex:1;display:flex;align-items:center;justify-content:center;padding:12px;overflow:hidden;}
+#board{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(6px,1.5vw,12px);
+  width:min(92vw,92vh - 80px,420px);aspect-ratio:1;max-width:420px;}
+.tile{border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-weight:bold;font-family:'Courier New',monospace;
+  font-size:clamp(14px,4vw,26px);letter-spacing:1px;
+  transition:all .1s;aspect-ratio:1;}
+.t0{background:rgba(0,255,65,.05);border:1px solid rgba(0,255,65,.1);}
+.t2{background:rgba(0,255,65,.12);border:1px solid rgba(0,255,65,.4);color:#00ff41;text-shadow:0 0 8px #00ff41;}
+.t4{background:rgba(0,255,65,.2);border:1px solid rgba(0,255,65,.6);color:#00ff41;text-shadow:0 0 10px #00ff41;}
+.t8{background:rgba(0,200,255,.2);border:1px solid #00cfff;color:#00cfff;text-shadow:0 0 10px #00cfff;}
+.t16{background:rgba(0,200,255,.3);border:1px solid #00cfff;color:#00cfff;}
+.t32{background:rgba(100,100,255,.3);border:1px solid #8888ff;color:#aaaaff;}
+.t64{background:rgba(150,50,255,.3);border:1px solid #cc66ff;color:#cc66ff;}
+.t128{background:rgba(255,200,0,.2);border:1px solid #ffdd00;color:#ffdd00;text-shadow:0 0 12px #ffdd00;}
+.t256{background:rgba(255,150,0,.25);border:1px solid #ff9900;color:#ff9900;}
+.t512{background:rgba(255,80,0,.3);border:1px solid #ff6600;color:#ff6600;}
+.t1024{background:rgba(255,50,100,.3);border:1px solid #ff3366;color:#ff3366;}
+.t2048{background:rgba(255,255,100,.3);border:2px solid #ffff44;color:#ffff44;
+  text-shadow:0 0 20px #ffff44;animation:win .5s infinite alternate;}
+@keyframes win{from{box-shadow:0 0 10px #ffff44}to{box-shadow:0 0 30px #ffff44}}
+.tile.merge{animation:pop .15s ease-out;}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.18)}100%{transform:scale(1)}}
+#ov{position:fixed;inset:0;background:rgba(0,0,0,.92);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:10;}
+.ov-t{font-size:clamp(22px,6vw,40px);font-weight:bold;letter-spacing:4px;text-shadow:0 0 18px #00ff41;}
+.ov-s{font-size:clamp(12px,2.5vw,16px);opacity:.6;letter-spacing:2px;text-align:center;}
+.big-btn{background:rgba(0,255,65,.1);border:3px solid #00ff41;color:#00ff41;
+  font-family:'Courier New',monospace;font-size:clamp(16px,4vw,24px);font-weight:bold;
+  letter-spacing:4px;padding:16px 44px;border-radius:8px;cursor:pointer;
+  text-shadow:0 0 10px #00ff41;}
+.big-btn:active{background:rgba(0,255,65,.3);transform:scale(.96);}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <button class="hbtn" onclick="location.href='radar_control.html'">RADAR</button>
+  <div style="text-align:center">
+    <div style="font-size:10px;opacity:.45;letter-spacing:3px">PUNTEGGIO</div>
+    <div id="sval">0</div>
+  </div>
+  <div style="text-align:right;font-size:11px;opacity:.45">
+    REC <span id="hi">0</span>
+  </div>
+</div>
+<div id="main"><div id="board"></div></div>
+<div id="ov">
+  <div class="ov-t">-- 2048 --</div>
+  <div class="ov-s">Unisci i numeri uguali!<br>Arriva a 2048!</div>
+  <button class="big-btn" onclick="startGame()">GIOCA</button>
+</div>
+<script>
+let grid,score=0,run=false;
+let hi=+localStorage.getItem('g2048_hi')||0;
+document.getElementById('hi').textContent=hi;
+
+function startGame(){
+  document.getElementById('ov').style.display='none';
+  grid=Array.from({length:4},()=>Array(4).fill(0));
+  score=0; run=true;
+  document.getElementById('sval').textContent=0;
+  addRandom(); addRandom();
+  render();
+}
+
+function addRandom(){
+  const empty=[];
+  grid.forEach((row,r)=>row.forEach((v,c)=>{if(!v)empty.push([r,c]);}));
+  if(!empty.length) return;
+  const [r,c]=empty[~~(Math.random()*empty.length)];
+  grid[r][c]=Math.random()<0.85?2:4;
+}
+
+function render(){
+  const board=document.getElementById('board');
+  board.innerHTML='';
+  grid.forEach(row=>row.forEach(v=>{
+    const d=document.createElement('div');
+    d.className='tile t'+(v||0);
+    d.textContent=v||'';
+    board.appendChild(d);
+  }));
+}
+
+function move(dir){
+  if(!run) return;
+  const old=JSON.stringify(grid);
+  let added=0;
+  if(dir==='L'||dir==='R'){
+    grid=grid.map(row=>mergeRow(dir==='R'?[...row].reverse():row,v=>{added+=v;}).result.map((v,_,a)=>v)).map((row,r,a)=>dir==='R'?row.reverse():row);
+    // redo properly
+  }
+  // Simpler clean implementation:
+  const newGrid=Array.from({length:4},()=>Array(4).fill(0));
+  let moved=false;
+
+  for(let r=0;r<4;r++){
+    for(let c=0;c<4;c++) newGrid[r][c]=grid[r][c];
+  }
+
+  function slideRow(row){
+    let a=row.filter(v=>v);
+    for(let i=0;i<a.length-1;i++){
+      if(a[i]===a[i+1]){const v=a[i]*2;score+=v;a[i]=v;a[i+1]=0;}
+    }
+    a=a.filter(v=>v);
+    while(a.length<4) a.push(0);
+    return a;
+  }
+
+  let ng=grid.map(r=>[...r]);
+  if(dir==='L') ng=ng.map(r=>slideRow(r));
+  if(dir==='R') ng=ng.map(r=>slideRow(r.reverse()).reverse());
+  if(dir==='U'){
+    ng=transpose(ng).map(r=>slideRow(r));ng=transpose(ng);
+  }
+  if(dir==='D'){
+    ng=transpose(ng).map(r=>slideRow(r.reverse()).reverse());ng=transpose(ng);
+  }
+  if(JSON.stringify(ng)!==JSON.stringify(grid)){
+    grid=ng; moved=true;
+  }
+  if(moved){
+    addRandom();
+    document.getElementById('sval').textContent=score;
+    if(score>hi){hi=score;localStorage.setItem('g2048_hi',hi);document.getElementById('hi').textContent=hi;}
+    render();
+    // check win
+    if(grid.some(r=>r.includes(2048))){
+      document.querySelector('.ov-t').textContent='-- BRAVO! 2048! --';
+      document.querySelector('.ov-s').textContent='Punteggio: '+score;
+      document.querySelector('.big-btn').textContent='RIGIOCA';
+      document.getElementById('ov').style.display='flex';
+      return;
+    }
+    // check lose
+    if(isLost()){
+      document.querySelector('.ov-t').textContent='-- FINE --';
+      document.querySelector('.ov-s').textContent='Punteggio: '+score+'  Record: '+hi;
+      document.querySelector('.big-btn').textContent='RIGIOCA';
+      document.getElementById('ov').style.display='flex';
+    }
+  }
+}
+
+function transpose(g){return g[0].map((_,c)=>g.map(r=>r[c]));}
+
+function isLost(){
+  for(let r=0;r<4;r++)for(let c=0;c<4;c++){
+    if(!grid[r][c]) return false;
+    if(c<3&&grid[r][c]===grid[r][c+1]) return false;
+    if(r<3&&grid[r][c]===grid[r+1][c]) return false;
+  }
+  return true;
+}
+
+// keyboard
+document.addEventListener('keydown',e=>{
+  const m={ArrowLeft:'L',ArrowRight:'R',ArrowUp:'U',ArrowDown:'D'};
+  if(m[e.key]){e.preventDefault();move(m[e.key]);}
+});
+
+// swipe
+let tx,ty;
+document.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
+document.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;
+  if(Math.abs(dx)<20&&Math.abs(dy)<20) return;
+  if(Math.abs(dx)>Math.abs(dy)) move(dx>0?'R':'L');
+  else move(dy>0?'D':'U');
+},{passive:true});
+</script>
+</body>
+</html>
