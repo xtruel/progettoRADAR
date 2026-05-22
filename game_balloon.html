@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>PALLONCINI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{background:#000;color:#00ff41;font-family:'Courier New',monospace;
+  height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none;}
+#hdr{display:flex;justify-content:space-between;align-items:center;
+  padding:8px 14px;border-bottom:1px solid rgba(0,255,65,.25);flex-shrink:0;}
+.hbtn{background:none;border:1px solid rgba(0,255,65,.4);color:#00ff41;
+  font-family:'Courier New',monospace;font-size:12px;letter-spacing:2px;
+  padding:8px 14px;border-radius:4px;cursor:pointer;}
+.hbtn:active{background:rgba(0,255,65,.2);}
+#sval{font-size:clamp(20px,5vw,34px);font-weight:bold;text-shadow:0 0 10px #00ff41;}
+#main{flex:1;position:relative;overflow:hidden;cursor:crosshair;}
+canvas{display:block;width:100%;height:100%;}
+#timer-bar{position:absolute;top:0;left:0;height:4px;background:#00ff41;
+  transition:width .9s linear;box-shadow:0 0 8px #00ff41;}
+#ov{position:absolute;inset:0;background:rgba(0,0,0,.9);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;}
+.ov-t{font-size:clamp(22px,6vw,40px);font-weight:bold;letter-spacing:4px;text-shadow:0 0 18px #00ff41;}
+.ov-s{font-size:clamp(12px,2.5vw,16px);opacity:.6;letter-spacing:2px;text-align:center;line-height:1.8;}
+.big-btn{background:rgba(0,255,65,.1);border:3px solid #00ff41;color:#00ff41;
+  font-family:'Courier New',monospace;font-size:clamp(16px,4vw,24px);font-weight:bold;
+  letter-spacing:4px;padding:16px 44px;border-radius:8px;cursor:pointer;
+  text-shadow:0 0 10px #00ff41;}
+.big-btn:active{background:rgba(0,255,65,.3);transform:scale(.96);}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <button class="hbtn" onclick="location.href='radar_control.html'">RADAR</button>
+  <div style="text-align:center">
+    <div style="font-size:10px;opacity:.45;letter-spacing:3px">PUNTEGGIO</div>
+    <div id="sval">0</div>
+  </div>
+  <div style="text-align:right;font-size:11px;opacity:.45">
+    REC <span id="hi">0</span>
+  </div>
+</div>
+<div id="main">
+  <div id="timer-bar" style="width:100%"></div>
+  <canvas id="cv"></canvas>
+  <div id="ov">
+    <div class="ov-t">-- PALLONCINI --</div>
+    <div class="ov-s">Scoppia tutti i palloncini!<br>Prima che volino via!</div>
+    <button class="big-btn" onclick="startGame()">GIOCA</button>
+  </div>
+</div>
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+let W,H,balloons,score,timeLeft,run=false,raf,last=0,spawnT=0,timerI;
+let hi=+localStorage.getItem('bal_hi')||0;
+let pops=[]; // pop animations
+document.getElementById('hi').textContent=hi;
+
+const COLORS=['#ff4466','#ff8800','#ffdd00','#00cfff','#cc66ff','#ff66aa','#00ff41'];
+
+function resize(){
+  const m=document.getElementById('main');
+  W=cv.width=m.clientWidth; H=cv.height=m.clientHeight;
+}
+
+function startGame(){
+  document.getElementById('ov').style.display='none';
+  resize();
+  balloons=[]; pops=[]; score=0; timeLeft=45; run=true;
+  document.getElementById('sval').textContent=0;
+  document.getElementById('timer-bar').style.width='100%';
+  clearInterval(timerI);
+  timerI=setInterval(()=>{
+    timeLeft--;
+    const pct=(timeLeft/45)*100;
+    document.getElementById('timer-bar').style.width=pct+'%';
+    if(timeLeft<=0) endGame();
+  },1000);
+  cancelAnimationFrame(raf); last=performance.now();
+  raf=requestAnimationFrame(loop);
+}
+
+function spawnBalloon(){
+  const r=24+Math.random()*28;
+  const color=COLORS[~~(Math.random()*COLORS.length)];
+  const gold=Math.random()<0.08;
+  balloons.push({
+    x:r+Math.random()*(W-r*2),
+    y:H+r*2,
+    r, color: gold?'#ffdd00':color,
+    vy:-(0.8+Math.random()*1.4),
+    vx:(Math.random()-.5)*.6,
+    wobble:Math.random()*Math.PI*2,
+    gold, pts: gold?30:10,
+    dead:false
+  });
+}
+
+function loop(ts){
+  if(!run) return;
+  const dt=Math.min((ts-last)/16,3); last=ts;
+  update(dt); draw();
+  raf=requestAnimationFrame(loop);
+}
+
+function update(dt){
+  spawnT-=dt;
+  if(spawnT<=0){ spawnBalloon(); spawnT=30+Math.random()*25; }
+
+  balloons.forEach(b=>{
+    b.y+=b.vy*dt; b.x+=b.vx*dt;
+    b.wobble+=0.04*dt;
+    b.x+=Math.sin(b.wobble)*0.4;
+    if(b.x<b.r) b.vx=Math.abs(b.vx);
+    if(b.x>W-b.r) b.vx=-Math.abs(b.vx);
+  });
+  balloons=balloons.filter(b=>!b.dead&&b.y>-b.r*3);
+
+  // pop animations
+  pops.forEach(p=>{p.r+=3*dt;p.alpha-=0.04*dt;});
+  pops=pops.filter(p=>p.alpha>0);
+}
+
+function draw(){
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+
+  // background stars
+  ctx.fillStyle='rgba(0,255,65,.08)';
+  for(let i=0;i<20;i++){
+    const x=(i*137+Date.now()*.005)%W;
+    const y=(i*97+Date.now()*.003)%H;
+    ctx.fillRect(x,y,1,1);
+  }
+
+  // balloons
+  balloons.forEach(b=>{
+    // string
+    ctx.strokeStyle='rgba(255,255,255,.2)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(b.x,b.y+b.r); ctx.lineTo(b.x,b.y+b.r+b.r*.8); ctx.stroke();
+
+    // glow
+    const grd=ctx.createRadialGradient(b.x-b.r*.25,b.y-b.r*.2,1,b.x,b.y,b.r*1.2);
+    grd.addColorStop(0,b.color+'aa');
+    grd.addColorStop(1,b.color+'00');
+    ctx.fillStyle=grd;
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r*1.2,0,Math.PI*2); ctx.fill();
+
+    // body
+    ctx.shadowBlur=b.gold?20:10; ctx.shadowColor=b.color;
+    ctx.fillStyle=b.color;
+    ctx.beginPath(); ctx.ellipse(b.x,b.y,b.r,b.r*1.1,0,0,Math.PI*2); ctx.fill();
+
+    // shine
+    ctx.fillStyle='rgba(255,255,255,.35)';
+    ctx.beginPath(); ctx.ellipse(b.x-b.r*.28,b.y-b.r*.28,b.r*.22,b.r*.15,-0.5,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+
+    if(b.gold){
+      ctx.fillStyle='rgba(255,255,255,.8)'; ctx.font=`bold ${b.r*.6}px sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('X3',b.x,b.y);
+    }
+  });
+
+  // pop effects
+  pops.forEach(p=>{
+    ctx.globalAlpha=p.alpha;
+    ctx.strokeStyle=p.color; ctx.lineWidth=2;
+    ctx.shadowBlur=10; ctx.shadowColor=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.stroke();
+    // score text
+    ctx.fillStyle=p.color; ctx.font=`bold ${16+p.r*.2}px Courier New`;
+    ctx.textAlign='center'; ctx.fillText('+'+p.pts,p.x,p.y-p.r);
+    ctx.shadowBlur=0;
+  });
+  ctx.globalAlpha=1;
+}
+
+function hitAt(mx,my){
+  for(let i=balloons.length-1;i>=0;i--){
+    const b=balloons[i];
+    if(Math.hypot(mx-b.x,my-b.y)<b.r*1.1){
+      pops.push({x:b.x,y:b.y,r:b.r,color:b.color,alpha:1,pts:b.pts});
+      score+=b.pts;
+      document.getElementById('sval').textContent=score;
+      balloons.splice(i,1);
+      break;
+    }
+  }
+}
+
+cv.addEventListener('click',e=>{
+  const rect=cv.getBoundingClientRect();
+  hitAt((e.clientX-rect.left)*(W/rect.width),(e.clientY-rect.top)*(H/rect.height));
+});
+cv.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  const rect=cv.getBoundingClientRect();
+  Array.from(e.changedTouches).forEach(t=>{
+    hitAt((t.clientX-rect.left)*(W/rect.width),(t.clientY-rect.top)*(H/rect.height));
+  });
+},{passive:false});
+
+function endGame(){
+  run=false; clearInterval(timerI);
+  if(score>hi){hi=score;localStorage.setItem('bal_hi',hi);document.getElementById('hi').textContent=hi;}
+  document.querySelector('.ov-t').textContent=score>100?'-- FANTASTICO! --':'-- FINE --';
+  document.querySelector('.ov-s').textContent='PUNTEGGIO: '+score+'   RECORD: '+hi;
+  document.querySelector('.big-btn').textContent='RIGIOCA';
+  document.getElementById('ov').style.display='flex';
+}
+</script>
+</body>
+</html>
