@@ -1252,15 +1252,12 @@ function drawCam(){
     drawPilotHUD(W,H);
   }
   else if(camFx==='secret'){
-    // Scanlines
     for(let y=0;y<H;y+=4){
       camCtx.fillStyle='rgba(0,0,0,0.15)'; camCtx.fillRect(0,y,W,1);
     }
-    // Red tint
     camCtx.globalCompositeOperation='multiply';
     camCtx.fillStyle='rgba(255,50,50,0.25)'; camCtx.fillRect(0,0,W,H);
     camCtx.globalCompositeOperation='source-over';
-    // TOP SECRET text
     camCtx.save();
     camCtx.globalAlpha=0.7;
     camCtx.translate(W/2,H/2); camCtx.rotate(-0.4);
@@ -1269,11 +1266,131 @@ function drawCam(){
     camCtx.strokeText('TOP SECRET',-(W*.3),0);
     camCtx.strokeText('CLASSIFICATO',-(W*.35),Math.max(35,W*.07)+5);
     camCtx.restore();
-    // Corner labels
     camCtx.fillStyle='rgba(255,0,0,0.8)';
     camCtx.font=`${Math.max(10,W*.022)}px Courier New`;
     camCtx.fillText('◉ AGENTE CONFERMATO',12,22);
     camCtx.fillText('◉ IDENTITÀ VERIFICATA',12,H-12);
+  }
+  else if(camFx==='pixel'){
+    // Pixelate
+    const pxSz = Math.max(8, Math.floor(W/40));
+    const tmp = document.createElement('canvas');
+    tmp.width=Math.floor(W/pxSz); tmp.height=Math.floor(H/pxSz);
+    tmp.getContext('2d').drawImage(camCv,0,0,tmp.width,tmp.height);
+    camCtx.imageSmoothingEnabled=false;
+    camCtx.drawImage(tmp,0,0,W,H);
+    camCtx.imageSmoothingEnabled=true;
+    camCtx.fillStyle='rgba(0,255,65,0.55)';
+    camCtx.font=`bold ${Math.max(13,W*.032)}px Courier New`;
+    camCtx.fillText('⬛ PIXEL',12,H-12);
+  }
+  else if(camFx==='rainbow'){
+    // Hue-rotate rainbow overlay cycling
+    const t=Date.now()/800;
+    const id=camCtx.getImageData(0,0,W,H);
+    const d=id.data;
+    for(let i=0;i<d.length;i+=4){
+      const nx=(i/4)%W/W, ny=Math.floor((i/4)/W)/H;
+      const hue=((nx+ny+t)*180)%360;
+      // Blend hue shift into pixel
+      const r=d[i],g=d[i+1],b=d[i+2];
+      const gray=(r+g+b)/3;
+      // convert hue to rgb
+      const hh=hue/60, s=0.7, v=gray/255;
+      const hi=Math.floor(hh)%6;
+      const f=hh-Math.floor(hh);
+      const pv=v*(1-s), qv=v*(1-s*f), tv=v*(1-s*(1-f));
+      let rr,gg,bb;
+      if(hi===0){rr=v;gg=tv;bb=pv;}
+      else if(hi===1){rr=qv;gg=v;bb=pv;}
+      else if(hi===2){rr=pv;gg=v;bb=tv;}
+      else if(hi===3){rr=pv;gg=qv;bb=v;}
+      else if(hi===4){rr=tv;gg=pv;bb=v;}
+      else{rr=v;gg=pv;bb=qv;}
+      d[i]=Math.min(255,rr*255*.7+r*.3);
+      d[i+1]=Math.min(255,gg*255*.7+g*.3);
+      d[i+2]=Math.min(255,bb*255*.7+b*.3);
+    }
+    camCtx.putImageData(id,0,0);
+    camCtx.fillStyle='rgba(255,255,255,0.8)';
+    camCtx.font=`bold ${Math.max(13,W*.032)}px Courier New`;
+    camCtx.fillText('🌈 ARCOBALENO',12,H-12);
+  }
+  else if(camFx==='mirror'){
+    // Left half mirrored onto right
+    const half=W/2;
+    camCtx.save();
+    camCtx.translate(W,0); camCtx.scale(-1,1);
+    camCtx.drawImage(camCv,0,0,half,H,0,0,half,H);
+    camCtx.restore();
+    // Vertical center line
+    camCtx.strokeStyle='rgba(0,255,200,0.35)'; camCtx.lineWidth=1.5;
+    camCtx.beginPath(); camCtx.moveTo(half,0); camCtx.lineTo(half,H); camCtx.stroke();
+    camCtx.fillStyle='rgba(0,255,200,0.7)';
+    camCtx.font=`bold ${Math.max(13,W*.032)}px Courier New`;
+    camCtx.fillText('⟺ SPECCHIO',12,H-12);
+  }
+  else if(camFx==='astro'){
+    // Space helmet vignette + stars + HUD
+    // Dark vignette circular mask
+    const vg=camCtx.createRadialGradient(W/2,H/2,H*.28,W/2,H/2,H*.62);
+    vg.addColorStop(0,'rgba(0,0,0,0)');
+    vg.addColorStop(0.7,'rgba(0,0,0,0.15)');
+    vg.addColorStop(1,'rgba(0,0,0,0.88)');
+    camCtx.fillStyle=vg; camCtx.fillRect(0,0,W,H);
+    // Helmet rim
+    camCtx.strokeStyle='rgba(180,220,255,0.55)'; camCtx.lineWidth=4;
+    camCtx.beginPath(); camCtx.arc(W/2,H/2,Math.min(W,H)*.42,0,Math.PI*2); camCtx.stroke();
+    // Stars
+    const seed=(Date.now()/8000)|0;
+    for(let s=0;s<30;s++){
+      const sx=((s*137+seed*7)%W);
+      const sy=((s*91+seed*13)%H);
+      const br=0.4+((s*17)%10)/10*.6;
+      camCtx.fillStyle=`rgba(255,255,255,${br})`;
+      camCtx.beginPath(); camCtx.arc(sx,sy,1+((s*3)%3)*.5,0,Math.PI*2); camCtx.fill();
+    }
+    // Blue tint
+    camCtx.globalCompositeOperation='screen';
+    camCtx.fillStyle='rgba(20,60,120,0.18)'; camCtx.fillRect(0,0,W,H);
+    camCtx.globalCompositeOperation='source-over';
+    // Label
+    camCtx.fillStyle='rgba(150,220,255,0.85)';
+    camCtx.font=`bold ${Math.max(13,W*.03)}px Courier New`;
+    camCtx.fillText('◉ MODALITÀ SPAZIO',12,24);
+    camCtx.font=`${Math.max(10,W*.022)}px Courier New`;
+    camCtx.fillStyle='rgba(150,220,255,0.5)';
+    camCtx.fillText(`O2: 98%   PRESS: OK   ORBITA: ${String(((Date.now()/1000)|0)%360).padStart(3,'0')}°`,12,H-12);
+  }
+  else if(camFx==='robot'){
+    // Grayscale + edge glow + scan line + green overlay
+    const id=camCtx.getImageData(0,0,W,H);
+    const d=id.data;
+    for(let i=0;i<d.length;i+=4){
+      const gr=d[i]*.21+d[i+1]*.72+d[i+2]*.07;
+      const edge=Math.min(255,gr*1.4);
+      d[i]=0; d[i+1]=Math.min(255,edge*1.1); d[i+2]=0;
+    }
+    camCtx.putImageData(id,0,0);
+    // Moving scan line
+    const scanY=(Date.now()/8)%H;
+    const sg=camCtx.createLinearGradient(0,scanY-6,0,scanY+6);
+    sg.addColorStop(0,'rgba(0,255,65,0)');
+    sg.addColorStop(0.5,'rgba(0,255,65,0.45)');
+    sg.addColorStop(1,'rgba(0,255,65,0)');
+    camCtx.fillStyle=sg; camCtx.fillRect(0,scanY-6,W,12);
+    // Grid overlay
+    camCtx.strokeStyle='rgba(0,255,65,0.06)'; camCtx.lineWidth=1;
+    const gs=Math.floor(W/16);
+    for(let x=0;x<W;x+=gs){ camCtx.beginPath(); camCtx.moveTo(x,0); camCtx.lineTo(x,H); camCtx.stroke(); }
+    for(let y=0;y<H;y+=gs){ camCtx.beginPath(); camCtx.moveTo(0,y); camCtx.lineTo(W,y); camCtx.stroke(); }
+    // Label
+    camCtx.fillStyle='rgba(0,255,65,0.85)';
+    camCtx.font=`bold ${Math.max(13,W*.03)}px Courier New`;
+    camCtx.fillText('◈ VISIONE ROBOT',12,24);
+    camCtx.font=`${Math.max(10,W*.022)}px Courier New`;
+    camCtx.fillStyle='rgba(0,255,65,0.5)';
+    camCtx.fillText(`SYS:OK  CPU:${30+((Date.now()/1000|0)%40)}%  TARGET:RILEVATO`,12,H-12);
   }
 
   camRaf=requestAnimationFrame(drawCam);
